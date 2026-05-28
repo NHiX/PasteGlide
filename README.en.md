@@ -1,6 +1,6 @@
 # PasteGlide
 
-PasteGlide is a native macOS clipboard manager written in Swift/AppKit. It stores a local SQLite history, classifies copied content, shows fast cards, and can appear at the bottom, top, sides, or center of the screen.
+PasteGlide is a native macOS clipboard manager written in Swift/AppKit. It keeps a local history, classifies copied content, shows fast cards, and can appear at the bottom, top, sides, or center of the screen.
 
 Documentation en français: [README.md](README.md)
 
@@ -14,8 +14,6 @@ Documentation en français: [README.md](README.md)
 
 ## Run
 
-From the project folder:
-
 ```bash
 swift run
 ```
@@ -26,129 +24,103 @@ Build a macOS app bundle in `dist/`:
 ./scripts/build_app.sh
 ```
 
-Generated bundles use this format:
-
-```text
-dist/PasteGlide_YYYY-MM-DD_HH-MM.app
-```
-
 ## Shortcuts
 
-The default global shortcut is `⌥⌘V`. It shows or hides the clipboard history panel.
+The default global shortcut is `⌥⌘V`.
 
 Inside the panel:
 
 - `←` / `→` / `↑` / `↓`: select a card
-- `Return`: copy the selected card
+- `Return`: copy and close
 - `Space`: show preview
-- `Delete`: delete the selected card
+- `Delete`: delete card
 - `⌘F`: focus search
-- `⌘1` to `⌘7`: switch filter
-- `Escape`: close the panel
+- `⌘1` to `⌘8`: switch filter
+- `Escape`: close
 
-## Usage
+## Cards and Actions
 
-1. Launch PasteGlide.
-2. Copy text, a URL, a YouTube link, numbers, a likely password, or an image.
-3. Press `⌥⌘V`.
-4. Search, filter, or navigate with the keyboard.
-5. Click a card or press `Return` to put it back on the clipboard.
+PasteGlide detects:
 
-Right-click a card for quick actions:
-
-- copy as plain text;
-- open a link;
-- save an image;
-- reveal or hide a password;
-- pin or unpin;
-- delete the card;
-- delete all cards of the same type.
-
-## Filters and Stats
-
-Below search, PasteGlide shows:
-
-- total stored objects;
-- image, text, number, password, and YouTube counts;
-- date and time of the latest card.
-
-Quick filters show:
-
-- all items;
-- pinned items only;
-- YouTube;
+- YouTube links;
+- general web links;
 - text;
-- passwords;
+- likely passwords;
 - numbers;
 - images.
 
+Right-click a card to copy without closing, copy as plain text, open a link, save an image, reveal a password, pin, delete one card, or delete all cards of the same type.
+
+## Search
+
+Search works across type, preview, text content, and OCR.
+
+Supported operators:
+
+- `type:image`, `type:text`, `type:url`, `type:youtube`, `type:password`, `type:number`
+- `pinned:true`
+- `after:2h`, `after:7d`, `after:2w`
+
+Example:
+
+```text
+type:image after:7d invoice
+```
+
+## Filters and Stats
+
+Below search, PasteGlide shows the total stored items, per-type counts, and the latest card date. Quick filters show all items, pinned items, YouTube, links, text, passwords, numbers, or images.
+
 ## Panel Positions
 
-In preferences, the panel can be shown:
-
-- bottom, above the Dock;
-- top;
-- left;
-- right;
-- center of the screen.
-
-`Left`, `Right`, and `Center` use a vertical scrolling column. `Bottom` and `Top` use a horizontal scrolling row.
+The panel can appear at the bottom, top, left, right, or center of the screen. Left, right, and center use a vertical scrolling column; top and bottom use a horizontal row.
 
 ## Privacy
 
 PasteGlide can:
 
 - skip likely passwords;
-- mask sensitive content in cards;
-- exclude applications by name or bundle id;
-- pause capture for 5, 15, or 30 minutes from the macOS menu bar menu.
+- mask sensitive content;
+- never capture images;
+- limit captured image size;
+- exclude applications;
+- pause capture for 5, 15, or 30 minutes.
 
-Password detection is heuristic because macOS does not expose the original copy context.
+## Memory Footprint
+
+Original images are no longer loaded with the card list. PasteGlide:
+
+- stores original images as files in `Application Support`;
+- keeps only a lightweight thumbnail for cards;
+- loads the original image on demand for copy, preview, or save;
+- uses a bounded image cache;
+- removes associated image files during cleanup.
 
 ## Images and OCR
 
-Images are converted to PNG, stored as base64 in SQLite, and displayed as thumbnails.
-
-When OCR is enabled, PasteGlide uses Apple's Vision.framework locally. Recognized text is searchable and visible in previews.
+Captured images are saved as PNG files. A thumbnail is kept for fast display. When OCR is enabled, Vision.framework analyzes images locally and makes recognized text searchable.
 
 ## Cleanup
 
-Preferences let you:
-
-- set how many items to keep;
-- set retention in days;
-- delete images;
-- delete items older than the configured retention;
-- clear all history.
-
-Pinned items survive automatic retention.
+Preferences let you set the history limit, retention, delete images, delete items older than retention, or clear all history. Pinned items survive automatic retention.
 
 ## Storage
 
-The local database is created here:
+SQLite database:
 
 ```text
 ~/Library/Application Support/PasteGlide/history.sqlite
 ```
 
-Logical schema:
+Externalized images:
 
-- `id`: SQLite identifier
-- `kind`: card type
-- `content`: full content
-- `preview`: displayed preview
-- `ocr_text`: recognized image text
-- `ocr_attempted`: OCR processing status
-- `is_pinned`: pinned card flag
-- `created_at`: creation date
-- `content_hash`: consecutive duplicate prevention hash
+```text
+~/Library/Application Support/PasteGlide/Images/
+```
 
 ## Import and Export
 
-The macOS menu bar menu can:
-
-- export the SQLite history;
-- import an existing history.
+The macOS menu bar menu supports SQLite and JSON import/export.
 
 ## Tests
 
@@ -160,10 +132,9 @@ swift run PasteGlideCoreTests
 
 If `⌥⌘V` does not respond, check whether another app already uses this shortcut.
 
-If history looks empty, copy a new item after launching PasteGlide: the app monitors the clipboard only while running.
-
 To reset history:
 
 ```bash
 rm ~/Library/Application\ Support/PasteGlide/history.sqlite
+rm -rf ~/Library/Application\ Support/PasteGlide/Images
 ```

@@ -40,6 +40,9 @@ final class KeyHandlingPanel: NSPanel {
             case "7":
                 keyController?.selectFilterSegment(6)
                 return
+            case "8":
+                keyController?.selectFilterSegment(7)
+                return
             default:
                 break
             }
@@ -76,7 +79,7 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
     private let scrollView = NSScrollView()
     private let stackView = NSStackView()
     private let searchField = NSSearchField()
-    private let filterControl = NSSegmentedControl(labels: ["Tous", "★", "YT", "Texte", "MDP", "#", "Img"], trackingMode: .selectOne, target: nil, action: nil)
+    private let filterControl = NSSegmentedControl(labels: ["Tous", "★", "YT", "Lien", "Texte", "MDP", "#", "Img"], trackingMode: .selectOne, target: nil, action: nil)
     private let statsLabel = NSTextField(labelWithString: "")
     private let lastCardLabel = NSTextField(labelWithString: "")
     private let lastCardDateFormatter: DateFormatter = {
@@ -255,6 +258,8 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
                 self?.deleteItem(selectedItem)
             } onTogglePin: { [weak self] selectedItem in
                 self?.togglePin(selectedItem)
+            } onCopyWithoutClosing: { [weak self] selectedItem in
+                self?.copyItem(selectedItem, closesPanel: false)
             } onCopyPlainText: { [weak self] selectedItem in
                 self?.copyPlainText(selectedItem)
             } onOpen: { [weak self] selectedItem in
@@ -263,6 +268,8 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
                 self?.saveImage(selectedItem)
             } onDeleteKind: { [weak self] selectedItem in
                 self?.deleteKind(selectedItem.kind)
+            } contentProvider: { [weak self] selectedItem in
+                self?.database.content(for: selectedItem) ?? selectedItem.content
             }
             cardViews.append(card)
             stackView.addArrangedSubview(card)
@@ -272,7 +279,8 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
     }
 
     private func filteredItems() -> [ClipboardItem] {
-        let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let rawQuery = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let search = parsedSearch(rawQuery)
         return allItems.filter { item in
             if showsPinnedOnly, !item.isPinned {
                 return false
@@ -280,11 +288,57 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
             if let selectedKindFilter, item.kind != selectedKindFilter {
                 return false
             }
-            guard !query.isEmpty else {
+            if let kind = search.kind, item.kind != kind {
+                return false
+            }
+            if let pinned = search.pinned, item.isPinned != pinned {
+                return false
+            }
+            if let cutoff = search.createdAfter, item.createdAt < cutoff {
+                return false
+            }
+            guard !search.text.isEmpty else {
                 return true
             }
-            return item.searchHaystack.contains(query)
+            return item.searchHaystack.contains(search.text)
         }
+    }
+
+    private func parsedSearch(_ query: String) -> (text: String, kind: ClipboardKind?, pinned: Bool?, createdAfter: Date?) {
+        var terms: [String] = []
+        var kind: ClipboardKind?
+        var pinned: Bool?
+        var createdAfter: Date?
+
+        for token in query.split(separator: " ") {
+            if token.hasPrefix("type:") {
+                let value = token.dropFirst("type:".count)
+                kind = ClipboardKind.allCases.first { $0.rawValue == value || $0.title.lowercased() == value }
+            } else if token.hasPrefix("pinned:") {
+                let value = token.dropFirst("pinned:".count)
+                pinned = value == "true" || value == "yes" || value == "1"
+            } else if token.hasPrefix("after:") {
+                let value = String(token.dropFirst("after:".count))
+                createdAfter = relativeCutoff(from: value)
+            } else {
+                terms.append(String(token))
+            }
+        }
+
+        return (terms.joined(separator: " "), kind, pinned, createdAfter)
+    }
+
+    private func relativeCutoff(from value: String) -> Date? {
+        guard value.count >= 2, let amount = Int(value.dropLast()) else { return nil }
+        let unit = value.suffix(1)
+        let seconds: TimeInterval
+        switch unit {
+        case "h": seconds = TimeInterval(amount * 60 * 60)
+        case "d": seconds = TimeInterval(amount * 24 * 60 * 60)
+        case "w": seconds = TimeInterval(amount * 7 * 24 * 60 * 60)
+        default: return nil
+        }
+        return Date().addingTimeInterval(-seconds)
     }
 
     private func updateStats() {
@@ -372,28 +426,31 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
         panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
     }
 
-    private func copyItem(_ item: ClipboardItem) {
+    private func copyItem(_ item: ClipboardItem, closesPanel: Bool = true) {
         pasteboard.clearContents()
-        if item.kind == .image, let data = Data(base64Encoded: item.content), let image = NSImage(data: data) {
+        let content = database.content(for: item)
+        if item.kind == .image, let data = Data(base64Encoded: content), let image = NSImage(data: data) {
             pasteboard.writeObjects([image])
         } else {
-            pasteboard.setString(item.content, forType: .string)
+            pasteboard.setString(content, forType: .string)
         }
-        panel.orderOut(nil)
+        if closesPanel {
+            panel.orderOut(nil)
+        }
     }
 
     private func copyPlainText(_ item: ClipboardItem) {
         pasteboard.clearContents()
-        pasteboard.setString(item.kind == .image ? item.preview : item.content, forType: .string)
+        pasteboard.setString(item.kind == .image ? item.preview : database.content(for: item), forType: .string)
     }
 
     private func openItem(_ item: ClipboardItem) {
-        guard item.kind != .image, let url = URL(string: item.content), url.scheme != nil else { return }
+        guard item.kind != .image, let url = URL(string: database.content(for: item)), url.scheme != nil else { return }
         NSWorkspace.shared.open(url)
     }
 
     private func saveImage(_ item: ClipboardItem) {
-        guard item.kind == .image, let data = Data(base64Encoded: item.content) else { return }
+        guard item.kind == .image, let data = Data(base64Encoded: database.content(for: item)) else { return }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "PasteGlide-image.png"
         panel.allowedContentTypes = [.png]
@@ -472,10 +529,11 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
         showsPinnedOnly = segment == 1
         selectedKindFilter = switch segment {
         case 2: .youtube
-        case 3: .text
-        case 4: .password
-        case 5: .number
-        case 6: .image
+        case 3: .url
+        case 4: .text
+        case 5: .password
+        case 6: .number
+        case 7: .image
         default: nil
         }
         selectedIndex = 0

@@ -9,14 +9,22 @@ import Vision
 
 @MainActor
 final class CardView: NSControl {
+    private static let imageCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 40
+        cache.totalCostLimit = 24 * 1024 * 1024
+        return cache
+    }()
     private let item: ClipboardItem
     private let onSelect: (ClipboardItem) -> Void
     private let onDelete: (ClipboardItem) -> Void
     private let onTogglePin: (ClipboardItem) -> Void
+    private let onCopyWithoutClosing: (ClipboardItem) -> Void
     private let onCopyPlainText: (ClipboardItem) -> Void
     private let onOpen: (ClipboardItem) -> Void
     private let onSaveImage: (ClipboardItem) -> Void
     private let onDeleteKind: (ClipboardItem) -> Void
+    private let contentProvider: (ClipboardItem) -> String
     private var revealed = false
     private let previewLabel = NSTextField(labelWithString: "")
     private var hoverTrackingArea: NSTrackingArea?
@@ -30,19 +38,23 @@ final class CardView: NSControl {
         onSelect: @escaping (ClipboardItem) -> Void,
         onDelete: @escaping (ClipboardItem) -> Void,
         onTogglePin: @escaping (ClipboardItem) -> Void,
+        onCopyWithoutClosing: @escaping (ClipboardItem) -> Void,
         onCopyPlainText: @escaping (ClipboardItem) -> Void,
         onOpen: @escaping (ClipboardItem) -> Void,
         onSaveImage: @escaping (ClipboardItem) -> Void,
-        onDeleteKind: @escaping (ClipboardItem) -> Void
+        onDeleteKind: @escaping (ClipboardItem) -> Void,
+        contentProvider: @escaping (ClipboardItem) -> String
     ) {
         self.item = item
         self.onSelect = onSelect
         self.onDelete = onDelete
         self.onTogglePin = onTogglePin
+        self.onCopyWithoutClosing = onCopyWithoutClosing
         self.onCopyPlainText = onCopyPlainText
         self.onOpen = onOpen
         self.onSaveImage = onSaveImage
         self.onDeleteKind = onDeleteKind
+        self.contentProvider = contentProvider
         super.init(frame: .zero)
         self.identifier = NSUserInterfaceItemIdentifier(String(item.id))
         setup()
@@ -66,10 +78,11 @@ final class CardView: NSControl {
         if item.kind == .password {
             menu.addItem(NSMenuItem(title: revealed ? "Masquer" : "Révéler", action: #selector(toggleReveal), keyEquivalent: ""))
         }
+        menu.addItem(NSMenuItem(title: "Copier sans fermer", action: #selector(copyWithoutClosing), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Copier en texte brut", action: #selector(copyPlainText), keyEquivalent: ""))
         if item.kind == .image {
             menu.addItem(NSMenuItem(title: "Enregistrer l'image", action: #selector(saveImage), keyEquivalent: ""))
-        } else if URL(string: item.content)?.scheme != nil {
+        } else if URL(string: contentProvider(item))?.scheme != nil {
             menu.addItem(NSMenuItem(title: "Ouvrir le lien", action: #selector(openItem), keyEquivalent: ""))
         }
         menu.addItem(NSMenuItem(title: item.isPinned ? "Désépingler" : "Épingler", action: #selector(togglePin), keyEquivalent: ""))
@@ -81,11 +94,15 @@ final class CardView: NSControl {
 
     @objc private func toggleReveal() {
         revealed.toggle()
-        previewLabel.stringValue = revealed ? item.content : item.preview
+            previewLabel.stringValue = revealed ? contentProvider(item) : item.preview
     }
 
     @objc private func copyPlainText() {
         onCopyPlainText(item)
+    }
+
+    @objc private func copyWithoutClosing() {
+        onCopyWithoutClosing(item)
     }
 
     @objc private func openItem() {
@@ -197,7 +214,7 @@ final class CardView: NSControl {
     }
 
     private func makeLeadingView() -> NSView {
-        if item.kind == .image, let data = Data(base64Encoded: item.content), let image = NSImage(data: data) {
+        if item.kind == .image, let image = cachedImage(base64: item.content, suffix: "thumb") {
             let imageView = NSImageView(image: image)
             imageView.toolTip = tooltipText
             imageView.imageScaling = .scaleProportionallyUpOrDown
@@ -216,7 +233,7 @@ final class CardView: NSControl {
         badge.layer?.backgroundColor = item.kind.borderColor.withAlphaComponent(0.14).cgColor
         badge.translatesAutoresizingMaskIntoConstraints = false
 
-        let count = NSTextField(labelWithString: "\(item.content.count)")
+        let count = NSTextField(labelWithString: "\(contentProvider(item).count)")
         count.font = .monospacedDigitSystemFont(ofSize: 19, weight: .bold)
         count.alignment = .center
         count.textColor = .labelColor
@@ -264,7 +281,8 @@ final class CardView: NSControl {
     }
 
     private func makeImagePreviewPopover() -> NSPopover? {
-        guard let data = Data(base64Encoded: item.content), let image = NSImage(data: data) else { return nil }
+        let fullContent = contentProvider(item)
+        guard let data = Data(base64Encoded: fullContent), let image = cachedImage(base64: fullContent, suffix: "full") else { return nil }
 
         let imageView = NSImageView(image: image)
         imageView.imageScaling = .scaleProportionallyUpOrDown
@@ -331,13 +349,13 @@ final class CardView: NSControl {
     }
 
     private func makeTextPreviewPopover() -> NSPopover? {
-        let title = NSTextField(labelWithString: "\(item.kind.title) · \(item.content.count) caractères")
+        let title = NSTextField(labelWithString: "\(item.kind.title) · \(contentProvider(item).count) caractères")
         title.font = .systemFont(ofSize: 12, weight: .bold)
         title.textColor = .secondaryLabelColor
         title.translatesAutoresizingMaskIntoConstraints = false
 
         let textView = NSTextView()
-        textView.string = item.content
+        textView.string = contentProvider(item)
         textView.isEditable = false
         textView.isSelectable = true
         textView.drawsBackground = false
@@ -387,6 +405,7 @@ final class CardView: NSControl {
     private var badgeExcerpt: String {
         switch item.kind {
         case .youtube: "▶"
+        case .url: "↗"
         case .text: firstWords(maximum: 6)
         case .password: "••"
         case .number: "#"
@@ -402,7 +421,7 @@ final class CardView: NSControl {
         case .image:
             return imagePreviewText(header: header)
         default:
-            return "\(header)\n\(item.content)"
+            return "\(header)\n\(contentProvider(item))"
         }
     }
 
@@ -414,7 +433,7 @@ final class CardView: NSControl {
     }
 
     private func firstWords(maximum: Int) -> String {
-        let words = item.content
+        let words = contentProvider(item)
             .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .split(separator: " ")
@@ -423,7 +442,7 @@ final class CardView: NSControl {
     }
 
     private var textPreviewHeight: CGFloat {
-        let lineEstimate = max(1, item.content.count / 52)
+        let lineEstimate = max(1, contentProvider(item).count / 52)
         return min(max(CGFloat(lineEstimate * 20), 120), 260)
     }
 
@@ -460,4 +479,16 @@ final class CardView: NSControl {
         formatter.unitsStyle = .short
         return formatter
     }()
+
+    private func cachedImage(base64: String, suffix: String) -> NSImage? {
+        let key = "\(item.id)-\(item.contentHash)-\(suffix)" as NSString
+        if let image = Self.imageCache.object(forKey: key) {
+            return image
+        }
+        guard let data = Data(base64Encoded: base64), let image = NSImage(data: data) else {
+            return nil
+        }
+        Self.imageCache.setObject(image, forKey: key, cost: data.count)
+        return image
+    }
 }

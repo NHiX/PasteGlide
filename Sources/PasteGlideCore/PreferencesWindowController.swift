@@ -14,7 +14,9 @@ final class PreferencesWindowController: NSWindowController {
     private let hotKeyField = NSTextField()
     private let panelWidthField = NSTextField()
     private let panelPositionPopUp = NSPopUpButton()
+    private let maxImageSizeField = NSTextField()
     private let ocrCheckbox = NSButton(checkboxWithTitle: "Activer l'OCR des images", target: nil, action: nil)
+    private let captureImagesCheckbox = NSButton(checkboxWithTitle: "Mémoriser les images", target: nil, action: nil)
     private let capturePasswordsCheckbox = NSButton(checkboxWithTitle: "Mémoriser les mots de passe probables", target: nil, action: nil)
     private let maskSensitiveCheckbox = NSButton(checkboxWithTitle: "Masquer les contenus sensibles dans les cartes", target: nil, action: nil)
     private let excludedAppsField = NSTextField()
@@ -25,7 +27,7 @@ final class PreferencesWindowController: NSWindowController {
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 430),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 470),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -47,9 +49,11 @@ final class PreferencesWindowController: NSWindowController {
         retentionField.stringValue = "\(settings.retentionDays)"
         hotKeyField.stringValue = settings.hotKeyCharacter
         panelWidthField.stringValue = "\(settings.panelWidthPercent)"
+        maxImageSizeField.stringValue = "\(settings.maxCapturedImageMegabytes)"
         PanelPosition.allCases.forEach { panelPositionPopUp.addItem(withTitle: $0.title) }
         panelPositionPopUp.selectItem(withTitle: settings.panelPosition.title)
         ocrCheckbox.state = settings.isOCREnabled ? .on : .off
+        captureImagesCheckbox.state = settings.shouldCaptureImages ? .on : .off
         capturePasswordsCheckbox.state = settings.shouldCapturePasswords ? .on : .off
         maskSensitiveCheckbox.state = settings.shouldMaskSensitiveContent ? .on : .off
         excludedAppsField.stringValue = settings.excludedApplications.joined(separator: ", ")
@@ -76,6 +80,8 @@ final class PreferencesWindowController: NSWindowController {
         stack.addArrangedSubview(row(label: "Largeur panneau (%)", field: panelWidthField))
         stack.addArrangedSubview(row(label: "Position du panneau", control: panelPositionPopUp))
         stack.addArrangedSubview(ocrCheckbox)
+        stack.addArrangedSubview(captureImagesCheckbox)
+        stack.addArrangedSubview(row(label: "Image max (Mo)", field: maxImageSizeField))
         stack.addArrangedSubview(capturePasswordsCheckbox)
         stack.addArrangedSubview(maskSensitiveCheckbox)
         stack.addArrangedSubview(row(label: "Apps exclues", field: excludedAppsField))
@@ -123,11 +129,13 @@ final class PreferencesWindowController: NSWindowController {
         settings.retentionDays = Int(retentionField.stringValue) ?? settings.retentionDays
         settings.hotKeyCharacter = hotKeyField.stringValue
         settings.panelWidthPercent = Int(panelWidthField.stringValue) ?? settings.panelWidthPercent
+        settings.maxCapturedImageMegabytes = Int(maxImageSizeField.stringValue) ?? settings.maxCapturedImageMegabytes
         if let selectedTitle = panelPositionPopUp.selectedItem?.title,
            let position = PanelPosition.allCases.first(where: { $0.title == selectedTitle }) {
             settings.panelPosition = position
         }
         settings.isOCREnabled = ocrCheckbox.state == .on
+        settings.shouldCaptureImages = captureImagesCheckbox.state == .on
         settings.shouldCapturePasswords = capturePasswordsCheckbox.state == .on
         settings.shouldMaskSensitiveContent = maskSensitiveCheckbox.state == .on
         settings.excludedApplications = excludedAppsField.stringValue.split(separator: ",").map(String.init)

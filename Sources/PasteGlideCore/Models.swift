@@ -9,6 +9,7 @@ import Vision
 
 public enum ClipboardKind: String, CaseIterable {
     case youtube
+    case url
     case text
     case password
     case number
@@ -17,6 +18,7 @@ public enum ClipboardKind: String, CaseIterable {
     public var title: String {
         switch self {
         case .youtube: "YouTube"
+        case .url: "Lien"
         case .text: "Texte"
         case .password: "Mot de passe"
         case .number: "Chiffres"
@@ -27,6 +29,7 @@ public enum ClipboardKind: String, CaseIterable {
     public var borderColor: NSColor {
         switch self {
         case .youtube: .systemRed
+        case .url: .systemTeal
         case .text: .systemYellow
         case .password: .systemPurple
         case .number: .systemBlue

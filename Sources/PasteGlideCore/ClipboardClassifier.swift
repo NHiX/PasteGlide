@@ -15,6 +15,9 @@ public final class ClipboardClassifier {
         if isYouTubeURL(trimmed) {
             return .youtube
         }
+        if isURL(trimmed) {
+            return .url
+        }
         if trimmed.range(of: #"^\d{2,}$"#, options: .regularExpression) != nil {
             return .number
         }
@@ -43,6 +46,13 @@ public final class ClipboardClassifier {
             return false
         }
         return host == "youtu.be" || host == "youtube.com" || host.hasSuffix(".youtube.com")
+    }
+
+    private func isURL(_ value: String) -> Bool {
+        guard let url = URL(string: value), let scheme = url.scheme?.lowercased(), url.host != nil else {
+            return false
+        }
+        return scheme == "http" || scheme == "https"
     }
 
     private func isLikelyPassword(_ value: String) -> Bool {

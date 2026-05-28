@@ -42,6 +42,9 @@ final class ClipboardMonitor {
         guard !AppSettings.shared.isExcluded(application: NSWorkspace.shared.frontmostApplication) else { return }
 
         if let image = NSImage(pasteboard: pasteboard), let base64 = image.pngBase64() {
+            guard AppSettings.shared.shouldCaptureImages else { return }
+            let maxBytes = AppSettings.shared.maxCapturedImageMegabytes * 1024 * 1024
+            guard (base64.count * 3 / 4) <= maxBytes else { return }
             let hash = Self.hash("image:\(base64)")
             let preview = image.previewText()
             try? database.insert(kind: .image, content: base64, preview: preview, ocrAttempted: !AppSettings.shared.isOCREnabled, hash: hash)

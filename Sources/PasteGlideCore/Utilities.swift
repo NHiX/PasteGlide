@@ -66,6 +66,16 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "shouldCapturePasswords") }
     }
 
+    public var shouldCaptureImages: Bool {
+        get { defaults.object(forKey: "shouldCaptureImages") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "shouldCaptureImages") }
+    }
+
+    public var maxCapturedImageMegabytes: Int {
+        get { defaults.integer(forKey: "maxCapturedImageMegabytes") == 0 ? 20 : defaults.integer(forKey: "maxCapturedImageMegabytes") }
+        set { defaults.set(min(max(newValue, 1), 200), forKey: "maxCapturedImageMegabytes") }
+    }
+
     public var shouldMaskSensitiveContent: Bool {
         get { defaults.object(forKey: "shouldMaskSensitiveContent") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "shouldMaskSensitiveContent") }

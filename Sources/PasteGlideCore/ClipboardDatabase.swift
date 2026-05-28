@@ -10,14 +10,17 @@ import Vision
 public final class ClipboardDatabase {
     private var db: OpaquePointer?
     public let path: String
+    private let imageDirectory: URL
 
     public init(path explicitPath: String? = nil) throws {
         if let explicitPath {
             self.path = explicitPath
+            self.imageDirectory = URL(fileURLWithPath: explicitPath).deletingLastPathComponent().appendingPathComponent("Images", isDirectory: true)
         } else {
             let directory = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Application Support/PasteGlide", isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            self.imageDirectory = directory.appendingPathComponent("Images", isDirectory: true)
             let databaseURL = directory.appendingPathComponent("history.sqlite")
             let legacyURL = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Application Support")
@@ -29,6 +32,7 @@ public final class ClipboardDatabase {
             }
             self.path = directory.appendingPathComponent("history.sqlite").path
         }
+        try FileManager.default.createDirectory(at: imageDirectory, withIntermediateDirectories: true)
 
         guard sqlite3_open(path, &db) == SQLITE_OK else {
             throw databaseError("Impossible d'ouvrir SQLite")
@@ -44,12 +48,16 @@ public final class ClipboardDatabase {
             ocr_attempted INTEGER NOT NULL DEFAULT 0,
             is_pinned INTEGER NOT NULL DEFAULT 0,
             created_at REAL NOT NULL,
-            content_hash TEXT NOT NULL
+            content_hash TEXT NOT NULL,
+            content_path TEXT NOT NULL DEFAULT '',
+            thumbnail TEXT NOT NULL DEFAULT ''
         );
         """)
         try addColumnIfNeeded(table: "clipboard_items", column: "ocr_text", definition: "TEXT NOT NULL DEFAULT ''")
         try addColumnIfNeeded(table: "clipboard_items", column: "ocr_attempted", definition: "INTEGER NOT NULL DEFAULT 0")
         try addColumnIfNeeded(table: "clipboard_items", column: "is_pinned", definition: "INTEGER NOT NULL DEFAULT 0")
+        try addColumnIfNeeded(table: "clipboard_items", column: "content_path", definition: "TEXT NOT NULL DEFAULT ''")
+        try addColumnIfNeeded(table: "clipboard_items", column: "thumbnail", definition: "TEXT NOT NULL DEFAULT ''")
         try execute("CREATE INDEX IF NOT EXISTS idx_clipboard_items_created_at ON clipboard_items(is_pinned DESC, created_at DESC);")
     }
 
@@ -72,7 +80,9 @@ public final class ClipboardDatabase {
     public func insert(kind: ClipboardKind, content: String, preview: String, ocrText: String = "", ocrAttempted: Bool = false, hash: String) throws {
         guard latestHash() != hash else { return }
 
-        let sql = "INSERT INTO clipboard_items (kind, content, preview, ocr_text, ocr_attempted, created_at, content_hash) VALUES (?, ?, ?, ?, ?, ?, ?);"
+        let storedImage = storeImageIfNeeded(kind: kind, content: content, hash: hash)
+        let storedContent = storedImage == nil ? content : ""
+        let sql = "INSERT INTO clipboard_items (kind, content, preview, ocr_text, ocr_attempted, created_at, content_hash, content_path, thumbnail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
@@ -80,12 +90,14 @@ public final class ClipboardDatabase {
         }
 
         sqlite3_bind_text(statement, 1, kind.rawValue, -1, sqliteTransient())
-        sqlite3_bind_text(statement, 2, content, -1, sqliteTransient())
+        sqlite3_bind_text(statement, 2, storedContent, -1, sqliteTransient())
         sqlite3_bind_text(statement, 3, preview, -1, sqliteTransient())
         sqlite3_bind_text(statement, 4, ocrText, -1, sqliteTransient())
         sqlite3_bind_int(statement, 5, ocrAttempted ? 1 : 0)
         sqlite3_bind_double(statement, 6, Date().timeIntervalSince1970)
         sqlite3_bind_text(statement, 7, hash, -1, sqliteTransient())
+        sqlite3_bind_text(statement, 8, storedImage?.path ?? "", -1, sqliteTransient())
+        sqlite3_bind_text(statement, 9, storedImage?.thumbnail ?? "", -1, sqliteTransient())
 
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw databaseError("Insertion impossible")
@@ -95,13 +107,21 @@ public final class ClipboardDatabase {
     }
 
     public func fetchRecent() -> [ClipboardItem] {
-        let sql = "SELECT id, kind, content, preview, ocr_text, is_pinned, created_at, content_hash FROM clipboard_items ORDER BY is_pinned DESC, created_at DESC LIMIT ?;"
+        let sql = """
+        SELECT id, kind,
+               CASE WHEN kind = ? THEN thumbnail ELSE content END,
+               preview, ocr_text, is_pinned, created_at, content_hash
+        FROM clipboard_items
+        ORDER BY is_pinned DESC, created_at DESC
+        LIMIT ?;
+        """
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
             return []
         }
-        sqlite3_bind_int(statement, 1, Int32(AppSettings.shared.historyLimit))
+        sqlite3_bind_text(statement, 1, ClipboardKind.image.rawValue, -1, sqliteTransient())
+        sqlite3_bind_int(statement, 2, Int32(AppSettings.shared.historyLimit))
 
         var items: [ClipboardItem] = []
         while sqlite3_step(statement) == SQLITE_ROW {
@@ -129,9 +149,29 @@ public final class ClipboardDatabase {
         return items
     }
 
+    public func content(for item: ClipboardItem) -> String {
+        content(forID: item.id) ?? item.content
+    }
+
+    public func content(forID id: Int64) -> String? {
+        let sql = "SELECT content, content_path FROM clipboard_items WHERE id = ? LIMIT 1;"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return nil }
+        sqlite3_bind_int64(statement, 1, id)
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        let content = sqlite3_column_text(statement, 0).map { String(cString: $0) } ?? ""
+        let contentPath = sqlite3_column_text(statement, 1).map { String(cString: $0) } ?? ""
+        if !contentPath.isEmpty,
+           let data = try? Data(contentsOf: URL(fileURLWithPath: contentPath)) {
+            return data.base64EncodedString()
+        }
+        return content
+    }
+
     func fetchImagesMissingOCR() -> [ClipboardItem] {
         let sql = """
-        SELECT id, kind, content, preview, ocr_text, is_pinned, created_at, content_hash
+        SELECT id, kind, content, preview, ocr_text, is_pinned, created_at, content_hash, content_path
         FROM clipboard_items
         WHERE kind = ? AND ocr_attempted = 0
         ORDER BY created_at DESC
@@ -155,11 +195,18 @@ public final class ClipboardDatabase {
             let isPinned = sqlite3_column_int(statement, 5) == 1
             let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 6))
             let contentHash = sqlite3_column_text(statement, 7).map { String(cString: $0) } ?? ""
+            let contentPath = sqlite3_column_text(statement, 8).map { String(cString: $0) } ?? ""
+            let resolvedContent: String
+            if content.isEmpty, !contentPath.isEmpty, let data = try? Data(contentsOf: URL(fileURLWithPath: contentPath)) {
+                resolvedContent = data.base64EncodedString()
+            } else {
+                resolvedContent = content
+            }
             items.append(
                 ClipboardItem(
                     id: id,
                     kind: ClipboardKind(rawValue: kindRaw) ?? .image,
-                    content: content,
+                    content: resolvedContent,
                     preview: preview,
                     ocrText: ocrText,
                     isPinned: isPinned,
@@ -169,6 +216,41 @@ public final class ClipboardDatabase {
             )
         }
         return items
+    }
+
+    private func storeImageIfNeeded(kind: ClipboardKind, content: String, hash: String) -> (path: String, thumbnail: String)? {
+        guard kind == .image,
+              let data = Data(base64Encoded: content),
+              let image = NSImage(data: data) else {
+            return nil
+        }
+        let fileURL = imageDirectory.appendingPathComponent("\(hash).png")
+        try? data.write(to: fileURL, options: .atomic)
+        return (fileURL.path, image.thumbnailPNGBase64() ?? "")
+    }
+
+    private func removeImageFile(forID id: Int64) {
+        let sql = "SELECT content_path FROM clipboard_items WHERE id = ? LIMIT 1;"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return }
+        sqlite3_bind_int64(statement, 1, id)
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              let text = sqlite3_column_text(statement, 0) else { return }
+        let path = String(cString: text)
+        guard !path.isEmpty else { return }
+        try? FileManager.default.removeItem(atPath: path)
+    }
+
+    private func removeImageFiles(whereClause: String) {
+        let sql = "SELECT content_path FROM clipboard_items WHERE \(whereClause) AND content_path != '';"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return }
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let text = sqlite3_column_text(statement, 0) else { continue }
+            try? FileManager.default.removeItem(atPath: String(cString: text))
+        }
     }
 
     func updateOCR(for id: Int64, preview: String, ocrText: String) throws {
@@ -200,6 +282,7 @@ public final class ClipboardDatabase {
     }
 
     public func delete(id: Int64) throws {
+        removeImageFile(forID: id)
         let sql = "DELETE FROM clipboard_items WHERE id = ?;"
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
@@ -213,6 +296,9 @@ public final class ClipboardDatabase {
     }
 
     public func delete(kind: ClipboardKind) throws {
+        if kind == .image {
+            removeImageFiles(whereClause: "kind = '\(ClipboardKind.image.rawValue)'")
+        }
         let sql = "DELETE FROM clipboard_items WHERE kind = ?;"
         var statement: OpaquePointer?
         defer { sqlite3_finalize(statement) }
@@ -226,12 +312,14 @@ public final class ClipboardDatabase {
     }
 
     public func deleteAll() throws {
+        removeImageFiles(whereClause: "1 = 1")
         try execute("DELETE FROM clipboard_items;")
     }
 
     public func deleteOlderThan(days: Int) throws {
         guard days > 0 else { return }
         let cutoff = Date().addingTimeInterval(TimeInterval(-days * 24 * 60 * 60)).timeIntervalSince1970
+        removeImageFiles(whereClause: "is_pinned = 0 AND created_at < \(cutoff)")
         try execute("DELETE FROM clipboard_items WHERE is_pinned = 0 AND created_at < \(cutoff);")
     }
 
@@ -251,6 +339,55 @@ public final class ClipboardDatabase {
 
     func applyRetention() throws {
         try trimHistory(limit: AppSettings.shared.historyLimit, retentionDays: AppSettings.shared.retentionDays)
+    }
+
+    func exportJSON(to destinationURL: URL) throws {
+        let sql = "SELECT kind, content, preview, ocr_text, created_at, content_hash, is_pinned, content_path FROM clipboard_items ORDER BY created_at ASC;"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw databaseError("Export JSON impossible")
+        }
+
+        var rows: [[String: Any]] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let kind = sqlite3_column_text(statement, 0).map { String(cString: $0) } ?? ClipboardKind.text.rawValue
+            var content = sqlite3_column_text(statement, 1).map { String(cString: $0) } ?? ""
+            let contentPath = sqlite3_column_text(statement, 7).map { String(cString: $0) } ?? ""
+            if content.isEmpty, !contentPath.isEmpty, let data = try? Data(contentsOf: URL(fileURLWithPath: contentPath)) {
+                content = data.base64EncodedString()
+            }
+            rows.append([
+                "kind": kind,
+                "content": content,
+                "preview": sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? "",
+                "ocrText": sqlite3_column_text(statement, 3).map { String(cString: $0) } ?? "",
+                "createdAt": sqlite3_column_double(statement, 4),
+                "contentHash": sqlite3_column_text(statement, 5).map { String(cString: $0) } ?? "",
+                "isPinned": sqlite3_column_int(statement, 6) == 1
+            ])
+        }
+
+        let data = try JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: destinationURL, options: .atomic)
+    }
+
+    func importJSON(from sourceURL: URL) throws {
+        let data = try Data(contentsOf: sourceURL)
+        guard let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw databaseError("JSON invalide")
+        }
+        for row in rows {
+            guard let content = row["content"] as? String, !content.isEmpty else { continue }
+            let kind = row["kind"] as? String ?? ClipboardKind.text.rawValue
+            let preview = row["preview"] as? String ?? content
+            let ocrText = row["ocrText"] as? String ?? ""
+            let createdAt = row["createdAt"] as? Double ?? Date().timeIntervalSince1970
+            let hash = row["contentHash"] as? String ?? hashContent("\(kind):\(content)")
+            let isPinned = row["isPinned"] as? Bool ?? false
+            try insertImported(kind: kind, content: content, preview: preview, ocrText: ocrText, createdAt: createdAt, hash: hash, isPinned: isPinned)
+        }
+        try applyRetention()
     }
 
     func importItems(from sourcePath: String) throws {
@@ -282,9 +419,12 @@ public final class ClipboardDatabase {
 
     private func insertImported(kind: String, content: String, preview: String, ocrText: String, createdAt: Double, hash: String, isPinned: Bool) throws {
         guard !content.isEmpty else { return }
+        let clipboardKind = ClipboardKind(rawValue: kind) ?? .text
+        let storedImage = storeImageIfNeeded(kind: clipboardKind, content: content, hash: hash)
+        let storedContent = storedImage == nil ? content : ""
         let sql = """
-        INSERT INTO clipboard_items (kind, content, preview, ocr_text, ocr_attempted, is_pinned, created_at, content_hash)
-        SELECT ?, ?, ?, ?, 1, ?, ?, ?
+        INSERT INTO clipboard_items (kind, content, preview, ocr_text, ocr_attempted, is_pinned, created_at, content_hash, content_path, thumbnail)
+        SELECT ?, ?, ?, ?, 1, ?, ?, ?, ?, ?
         WHERE NOT EXISTS (SELECT 1 FROM clipboard_items WHERE content_hash = ?);
         """
         var statement: OpaquePointer?
@@ -293,13 +433,15 @@ public final class ClipboardDatabase {
             throw databaseError("Préparation import impossible")
         }
         sqlite3_bind_text(statement, 1, kind, -1, sqliteTransient())
-        sqlite3_bind_text(statement, 2, content, -1, sqliteTransient())
+        sqlite3_bind_text(statement, 2, storedContent, -1, sqliteTransient())
         sqlite3_bind_text(statement, 3, preview, -1, sqliteTransient())
         sqlite3_bind_text(statement, 4, ocrText, -1, sqliteTransient())
         sqlite3_bind_int(statement, 5, isPinned ? 1 : 0)
         sqlite3_bind_double(statement, 6, createdAt)
         sqlite3_bind_text(statement, 7, hash, -1, sqliteTransient())
-        sqlite3_bind_text(statement, 8, hash, -1, sqliteTransient())
+        sqlite3_bind_text(statement, 8, storedImage?.path ?? "", -1, sqliteTransient())
+        sqlite3_bind_text(statement, 9, storedImage?.thumbnail ?? "", -1, sqliteTransient())
+        sqlite3_bind_text(statement, 10, hash, -1, sqliteTransient())
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw databaseError("Import impossible")
         }

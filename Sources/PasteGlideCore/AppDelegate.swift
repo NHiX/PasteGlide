@@ -76,6 +76,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(menuItem(title: "Exporter l'historique", action: #selector(exportHistory), keyEquivalent: ""))
         menu.addItem(menuItem(title: "Importer un historique", action: #selector(importHistory), keyEquivalent: ""))
+        menu.addItem(menuItem(title: "Exporter JSON", action: #selector(exportJSON), keyEquivalent: ""))
+        menu.addItem(menuItem(title: "Importer JSON", action: #selector(importJSON), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         let quitItem = NSMenuItem(title: "Quitter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quitItem.target = NSApp
@@ -193,6 +195,27 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             try? database.importItems(from: url.path)
+            panelController?.reloadIfVisible()
+        }
+    }
+
+    @objc private func exportJSON() {
+        guard let database else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "PasteGlide-history.json"
+        panel.allowedContentTypes = [.json]
+        if panel.runModal() == .OK, let url = panel.url {
+            try? database.exportJSON(to: url)
+        }
+    }
+
+    @objc private func importJSON() {
+        guard let database else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            try? database.importJSON(from: url)
             panelController?.reloadIfVisible()
         }
     }

@@ -14,6 +14,7 @@ func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
 func testClassifierDetectsExpectedKinds() throws {
     let classifier = ClipboardClassifier()
     try expect(classifier.classifyString("https://www.youtube.com/watch?v=abc") == .youtube, "YouTube URL should be youtube")
+    try expect(classifier.classifyString("https://example.com/page") == .url, "general URL should be url")
     try expect(classifier.classifyString("1234567890") == .number, "digit-only string should be number")
     try expect(classifier.classifyString("Abcdef1!") == .password, "complex short token should be password")
     try expect(classifier.classifyString("Un texte simple") == .text, "plain sentence should be text")
@@ -56,10 +57,30 @@ func testPinnedItemsSurviveRetention() throws {
     try expect(contents.contains("second"), "latest unpinned item should remain")
 }
 
+func testImageContentLoadsLazily() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("PasteGlideTests-\(UUID().uuidString).sqlite")
+    defer {
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent().appendingPathComponent("Images"))
+    }
+
+    let database = try ClipboardDatabase(path: url.path)
+    let base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luz8XwAAAABJRU5ErkJggg=="
+    try database.insert(kind: .image, content: base64, preview: "Image 1x1", hash: "image-test")
+    guard let item = database.fetchRecent().first else {
+        throw TestFailure.failed("image item should exist")
+    }
+
+    try expect(item.content != base64, "recent image should expose thumbnail instead of original content")
+    try expect(database.content(for: item) == base64, "full image content should resolve on demand")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("classifierDetectsExpectedKinds", testClassifierDetectsExpectedKinds),
     ("searchHaystackUsesOCRButSkipsImageBase64", testSearchHaystackUsesOCRButSkipsImageBase64),
-    ("pinnedItemsSurviveRetention", testPinnedItemsSurviveRetention)
+    ("pinnedItemsSurviveRetention", testPinnedItemsSurviveRetention),
+    ("imageContentLoadsLazily", testImageContentLoadsLazily)
 ]
 
 for (name, test) in tests {
