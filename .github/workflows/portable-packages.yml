@@ -78,13 +78,15 @@ jobs:
         run: |
           swift --version
           swift build -c release --product PasteGlidePortable
+          $binPath = swift build -c release --product PasteGlidePortable --show-bin-path
+          Write-Host "SwiftPM bin path: $binPath"
           New-Item -ItemType Directory -Force -Path dist/windows/PasteGlide | Out-Null
-          $portableExe = Get-ChildItem .build -Recurse -File |
+          $portableExe = Get-ChildItem $binPath -Recurse -File |
             Where-Object { $_.Name -eq "PasteGlidePortable.exe" -or $_.Name -eq "PasteGlidePortable" } |
             Sort-Object FullName |
             Select-Object -First 1
           if (-not $portableExe) {
-            Get-ChildItem .build -Recurse -File |
+            Get-ChildItem $binPath -Recurse -File |
               Where-Object { $_.Name -like "*PasteGlidePortable*" } |
               Select-Object -ExpandProperty FullName
             throw "PasteGlidePortable.exe was not found after build."
