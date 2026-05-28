@@ -3,43 +3,13 @@ import Carbon
 import CryptoKit
 import Foundation
 import ImageIO
-import SQLite3
-import UniformTypeIdentifiers
-import Vision
-
-import AppKit
-import Carbon
-import CryptoKit
-import Foundation
-import ImageIO
+import PasteGlideShared
 import SQLite3
 import UniformTypeIdentifiers
 import Vision
 
 func sqliteTransient() -> sqlite3_destructor_type {
     unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-}
-
-public enum PanelPosition: String, CaseIterable {
-    case bottom
-    case top
-    case left
-    case right
-    case center
-
-    public var title: String {
-        switch self {
-        case .bottom: "Bas"
-        case .top: "Haut"
-        case .left: "Gauche"
-        case .right: "Droite"
-        case .center: "Milieu"
-        }
-    }
-
-    var isVertical: Bool {
-        self == .left || self == .right || self == .center
-    }
 }
 
 public final class AppSettings: @unchecked Sendable {

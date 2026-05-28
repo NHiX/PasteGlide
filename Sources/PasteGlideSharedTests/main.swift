@@ -81,10 +81,19 @@ func testSearchParsesOperatorsAndFiltersItems() throws {
     try expect(results.map(\.id) == [1], "search should keep only matching items")
 }
 
+func testPanelPositionSharedLayoutMetadata() throws {
+    try expect(PanelPosition.bottom.title == "Bas", "bottom title should stay localized")
+    try expect(PanelPosition.top.isVertical == false, "top layout should be horizontal")
+    try expect(PanelPosition.left.isVertical == true, "left layout should be vertical")
+    try expect(PanelPosition.right.isVertical == true, "right layout should be vertical")
+    try expect(PanelPosition.center.isVertical == true, "center layout should be vertical")
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("sharedClassifierDetectsExpectedKinds", testClassifierDetectsExpectedKinds),
     ("sharedSearchHaystackUsesOCRButSkipsImageBase64", testSearchHaystackUsesOCRButSkipsImageBase64),
-    ("sharedSearchParsesOperatorsAndFiltersItems", testSearchParsesOperatorsAndFiltersItems)
+    ("sharedSearchParsesOperatorsAndFiltersItems", testSearchParsesOperatorsAndFiltersItems),
+    ("sharedPanelPositionSharedLayoutMetadata", testPanelPositionSharedLayoutMetadata)
 ]
 
 for (name, test) in tests {
