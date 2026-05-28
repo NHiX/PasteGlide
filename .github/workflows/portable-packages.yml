@@ -71,38 +71,35 @@ jobs:
           if (-not $swift) {
             throw "Swift executable was not found after installation."
           }
-          $swiftPaths = @($swift.DirectoryName)
-          $swiftPaths += Get-ChildItem $swiftSearchRoots -Recurse -Filter *.dll -ErrorAction SilentlyContinue |
-            ForEach-Object { $_.DirectoryName } |
-            Sort-Object -Unique
-          $swiftPaths | Sort-Object -Unique | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $swiftRoot = Resolve-Path (Join-Path $swift.DirectoryName "..\..\..")
+          $sdk = Get-ChildItem $swiftRoot -Directory -Recurse -Filter Windows.sdk -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $sdk) {
+            throw "Swift Windows SDK was not found after installation."
+          }
+          $swift.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          "SDKROOT=$($sdk.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build portable executable
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           swift --version
-          swift build -c release --product PasteGlidePortable
-          if ($LASTEXITCODE -ne 0) {
-            throw "swift build failed with exit code $LASTEXITCODE"
-          }
-          $binPath = swift build -c release --product PasteGlidePortable --show-bin-path
-          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($binPath)) {
-            throw "SwiftPM did not return a release binary path."
-          }
-          Write-Host "SwiftPM bin path: $binPath"
           New-Item -ItemType Directory -Force -Path dist/windows/PasteGlide | Out-Null
-          $portableExe = Get-ChildItem $binPath -Recurse -File |
-            Where-Object { $_.Name -eq "PasteGlidePortable.exe" -or $_.Name -eq "PasteGlidePortable" } |
-            Sort-Object FullName |
-            Select-Object -First 1
-          if (-not $portableExe) {
-            Get-ChildItem $binPath -Recurse -File |
-              Where-Object { $_.Name -like "*PasteGlidePortable*" } |
-              Select-Object -ExpandProperty FullName
-            throw "PasteGlidePortable.exe was not found after build."
+          $sourceFiles = @(
+            Get-ChildItem Sources/PasteGlideShared -Filter *.swift | Sort-Object FullName | ForEach-Object { $_.FullName }
+          )
+          $sourceFiles += (Resolve-Path Sources/PasteGlidePortable/main.swift).Path
+          swiftc `
+            -sdk $env:SDKROOT `
+            -I "$env:SDKROOT\usr\lib\swift" `
+            -L "$env:SDKROOT\usr\lib\swift\windows" `
+            @sourceFiles `
+            -o dist/windows/PasteGlide/PasteGlide.exe
+          if ($LASTEXITCODE -ne 0) {
+            throw "swiftc failed with exit code $LASTEXITCODE"
           }
-          Copy-Item $portableExe.FullName dist/windows/PasteGlide/PasteGlide.exe
+          Copy-Item "$env:SDKROOT\usr\bin\*.dll" dist/windows/PasteGlide -ErrorAction SilentlyContinue
+          Copy-Item "$env:SDKROOT\usr\lib\swift\windows\*.dll" dist/windows/PasteGlide -ErrorAction SilentlyContinue
 
       - name: Install WiX
         shell: pwsh
