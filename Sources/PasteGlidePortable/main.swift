@@ -25,6 +25,8 @@ struct PasteGlidePortableCLI {
             return settingsDemo()
         case "store-demo":
             return storeDemo()
+        case "view-demo":
+            return viewDemo(Array(arguments.dropFirst()))
         case "help", "--help", "-h":
             printUsage()
             return 0
@@ -118,6 +120,46 @@ struct PasteGlidePortableCLI {
         }
     }
 
+    private func viewDemo(_ values: [String]) -> Int32 {
+        let query = values.joined(separator: " ")
+        let now = Date()
+        let state = ClipboardHistoryViewState(
+            allItems: [
+                ClipboardItem(
+                    id: 1,
+                    kind: .text,
+                    content: "Invoice PasteGlide portable demo",
+                    preview: "Invoice PasteGlide portable demo",
+                    ocrText: "",
+                    isPinned: true,
+                    createdAt: now.addingTimeInterval(-60),
+                    contentHash: "demo-text"
+                ),
+                ClipboardItem(
+                    id: 2,
+                    kind: .url,
+                    content: "https://example.com",
+                    preview: "https://example.com",
+                    ocrText: "",
+                    isPinned: false,
+                    createdAt: now.addingTimeInterval(-120),
+                    contentHash: "demo-url"
+                )
+            ],
+            searchText: query,
+            panelPosition: .left,
+            formatDate: { ISO8601DateFormatter().string(from: $0) }
+        )
+        let snapshot = state.snapshot()
+        output("layout=\(snapshot.isVerticalLayout ? "vertical" : "horizontal")")
+        output("items=\(snapshot.items.count)")
+        for line in snapshot.statsLines {
+            output("stats=\(line)")
+        }
+        output("latest=\(snapshot.latestItemText)")
+        return 0
+    }
+
     private func printUsage() {
         output("""
         PasteGlidePortable
@@ -127,6 +169,7 @@ struct PasteGlidePortableCLI {
           search-demo <query>   Run the shared search engine against demo items.
           settings-demo         Print normalized shared default settings.
           store-demo            Write and read a portable JSON history store.
+          view-demo <query>     Build a portable UI snapshot for demo items.
           help                  Show this help.
         """)
     }

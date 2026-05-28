@@ -40,7 +40,7 @@ Créer aussi le zip de `PasteGlide.app` publié avec les releases:
 
 Les releases GitHub publient `PasteGlide.dmg` et `PasteGlide.app.zip`. Le DMG contient `PasteGlide.app` et un raccourci `Applications` pour installer l'app par glisser-déposer. L'app est signée ad-hoc pour garder un bundle macOS cohérent; sans certificat Apple Developer ID et notarisation, macOS peut encore demander une ouverture via clic droit puis `Ouvrir`.
 
-Le workflow GitHub Actions `Portable Packages` produit aussi des paquets portables Linux et Windows: `.deb`, `.rpm`, `.msi` et `.zip`. Ces paquets embarquent le binaire `PasteGlidePortable`, qui valide le noyau partage multiplateforme, dont le stockage d'historique JSON portable; l'application graphique native Linux/Windows reste a porter. Voir [docs/PORTABILITY.md](docs/PORTABILITY.md).
+Le workflow GitHub Actions `Portable Packages` produit aussi des paquets portables Linux et Windows: `.deb`, `.rpm`, `.msi` et `.zip`. Ces paquets embarquent le binaire `PasteGlidePortable`, qui valide le noyau partage multiplateforme, dont le stockage d'historique JSON portable et le modele d'etat d'interface; l'application graphique native Linux/Windows reste a porter. Voir [docs/PORTABILITY.md](docs/PORTABILITY.md).
 
 Pour produire un DMG notarizé par Apple, il faut un compte Apple Developer, un certificat `Developer ID Application` et un profil `notarytool` enregistré dans le trousseau. Ensuite:
 

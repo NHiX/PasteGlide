@@ -20,7 +20,7 @@ public enum ClipboardKind: String, CaseIterable, Codable {
     }
 }
 
-public struct ClipboardItem: Identifiable {
+public struct ClipboardItem: Identifiable, Equatable {
     public let id: Int64
     public let kind: ClipboardKind
     public let content: String

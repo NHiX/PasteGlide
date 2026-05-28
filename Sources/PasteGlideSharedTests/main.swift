@@ -234,6 +234,92 @@ func testJSONClipboardHistoryStoreImportsArchives() throws {
     try expect(!exported.items[0].contentHash.isEmpty, "store should fill missing hashes during import")
 }
 
+func testClipboardHistoryViewStateBuildsHorizontalSnapshot() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_500)
+    let items = [
+        ClipboardItem(
+            id: 1,
+            kind: .text,
+            content: "Invoice portable UI",
+            preview: "Invoice portable UI",
+            ocrText: "",
+            isPinned: true,
+            createdAt: now.addingTimeInterval(-60),
+            contentHash: "text"
+        ),
+        ClipboardItem(
+            id: 2,
+            kind: .url,
+            content: "https://example.com",
+            preview: "https://example.com",
+            ocrText: "",
+            isPinned: false,
+            createdAt: now,
+            contentHash: "url"
+        )
+    ]
+    let state = ClipboardHistoryViewState(
+        allItems: items,
+        searchText: "type:text invoice",
+        panelPosition: .bottom,
+        formatDate: { "date:\(Int($0.timeIntervalSince1970))" }
+    )
+
+    let snapshot = state.snapshot()
+    try expect(snapshot.items.map(\.id) == [1], "view state should apply shared search filters")
+    try expect(snapshot.stats.total == 2, "stats should count every item, not only filtered items")
+    try expect(snapshot.stats.countsByKind[.text] == 1, "stats should count text items")
+    try expect(snapshot.stats.countsByKind[.url] == 1, "stats should count url items")
+    try expect(snapshot.statsLines.count == 1, "horizontal stats should fit on one line")
+    try expect(snapshot.statsLines[0].contains("2 objets memorises"), "horizontal stats should include total count")
+    try expect(snapshot.latestItemText == "Derniere carte : date:1700000500", "latest card text should use injected formatter")
+    try expect(snapshot.isVerticalLayout == false, "bottom panel should be horizontal")
+    try expect(snapshot.selectedItemID == 1, "selected item should be the filtered first item")
+}
+
+func testClipboardHistoryViewStateBuildsVerticalSnapshotAndClampsSelection() throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_600)
+    var state = ClipboardHistoryViewState(
+        allItems: [
+            ClipboardItem(
+                id: 1,
+                kind: .image,
+                content: "image-data",
+                preview: "Image",
+                ocrText: "ticket",
+                isPinned: false,
+                createdAt: now,
+                contentHash: "image"
+            ),
+            ClipboardItem(
+                id: 2,
+                kind: .text,
+                content: "Other text",
+                preview: "Other text",
+                ocrText: "",
+                isPinned: false,
+                createdAt: now.addingTimeInterval(-60),
+                contentHash: "text"
+            )
+        ],
+        selectedKindFilter: .image,
+        panelPosition: .left,
+        selectedIndex: 10,
+        formatDate: { _ in "formatted" }
+    )
+
+    var snapshot = state.snapshot()
+    try expect(snapshot.items.map(\.id) == [1], "kind filter should keep image items")
+    try expect(snapshot.statsLines.count == 3, "vertical stats should split onto multiple compact lines")
+    try expect(snapshot.isVerticalLayout, "left panel should be vertical")
+    try expect(snapshot.selectedItemID == 1, "selection should clamp to the last available item")
+
+    state.setSearchText("no-match")
+    snapshot = state.snapshot()
+    try expect(snapshot.items.isEmpty, "search text should update filtered items")
+    try expect(snapshot.selectedItemID == nil, "empty results should not expose a selected item")
+}
+
 func testPanelPositionSharedLayoutMetadata() throws {
     try expect(PanelPosition.bottom.title == "Bas", "bottom title should stay localized")
     try expect(PanelPosition.top.isVertical == false, "top layout should be horizontal")
@@ -285,6 +371,8 @@ let tests: [(String, () throws -> Void)] = [
     ("sharedJSONClipboardHistoryStorePersistsAndDeduplicatesItems", testJSONClipboardHistoryStorePersistsAndDeduplicatesItems),
     ("sharedJSONClipboardHistoryStorePreservesPinnedAndAppliesRetention", testJSONClipboardHistoryStorePreservesPinnedAndAppliesRetention),
     ("sharedJSONClipboardHistoryStoreImportsArchives", testJSONClipboardHistoryStoreImportsArchives),
+    ("sharedClipboardHistoryViewStateBuildsHorizontalSnapshot", testClipboardHistoryViewStateBuildsHorizontalSnapshot),
+    ("sharedClipboardHistoryViewStateBuildsVerticalSnapshotAndClampsSelection", testClipboardHistoryViewStateBuildsVerticalSnapshotAndClampsSelection),
     ("sharedPanelPositionSharedLayoutMetadata", testPanelPositionSharedLayoutMetadata),
     ("sharedSettingsRulesNormalizePortablePreferences", testSettingsRulesNormalizePortablePreferences),
     ("sharedSettingsRulesMatchExcludedApplications", testSettingsRulesMatchExcludedApplications)

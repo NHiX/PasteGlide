@@ -6,7 +6,7 @@ PasteGlide est aujourd'hui une application macOS native. Le code utilise AppKit,
 
 Le travail ajoute ici prepare le packaging sans masquer cette contrainte:
 
-- `PasteGlideShared` contient maintenant les modeles, la classification, la recherche/filtrage, les positions de panneau, les regles de preferences, un format d'archive JSON versionne et un stockage d'historique JSON sans AppKit, ce qui donne une premiere base compilable pour les ports.
+- `PasteGlideShared` contient maintenant les modeles, la classification, la recherche/filtrage, les positions de panneau, les regles de preferences, un format d'archive JSON versionne, un stockage d'historique JSON et un modele d'etat d'interface sans AppKit, ce qui donne une premiere base compilable pour les ports.
 - `PasteGlidePortable` est un premier executable portable de validation qui depend uniquement de `PasteGlideShared`.
 - `scripts/build_linux_packages.sh` package un binaire Linux existant en `.deb` et `.rpm` via `nfpm`.
 - `scripts/build_windows_packages.ps1` package un dossier Windows existant en `.zip` et, si WiX est installe, en `.msi`.
@@ -15,7 +15,7 @@ Le travail ajoute ici prepare le packaging sans masquer cette contrainte:
 
 ### Plan de portage
 
-1. Brancher les futures UI Linux/Windows sur `JSONClipboardHistoryStore`, puis remplacer seulement les services de plateforme.
+1. Brancher les futures UI Linux/Windows sur `JSONClipboardHistoryStore` et `ClipboardHistoryViewState`, puis remplacer seulement les services de plateforme.
 2. Remplacer les services macOS par des interfaces de plateforme: presse-papier, raccourci global, OCR, stockage d'images, notifications et ouverture de liens.
 3. Implementer une UI Linux avec GTK/libadwaita ou Qt, puis une UI Windows avec WinUI, Qt ou une fine couche native.
 4. Produire un binaire Linux `dist/linux/PasteGlide` et un dossier Windows `dist/windows/PasteGlide/PasteGlide.exe`.
@@ -30,6 +30,7 @@ swift run PasteGlidePortable classify "https://example.com"
 swift run PasteGlidePortable search-demo "type:text pinned:true invoice"
 swift run PasteGlidePortable settings-demo
 swift run PasteGlidePortable store-demo
+swift run PasteGlidePortable view-demo "type:text invoice"
 ```
 
 ### Packaging automatique
@@ -64,7 +65,7 @@ PasteGlide is currently a native macOS app. The code uses AppKit, Carbon, Vision
 
 The work added here prepares packaging without hiding that constraint:
 
-- `PasteGlideShared` now contains the models, classification, search/filtering, panel positions, preference rules, a versioned JSON archive format, and a JSON history store without AppKit, providing a first compilable base for the ports.
+- `PasteGlideShared` now contains the models, classification, search/filtering, panel positions, preference rules, a versioned JSON archive format, a JSON history store, and a UI state model without AppKit, providing a first compilable base for the ports.
 - `PasteGlidePortable` is a first portable validation executable that depends only on `PasteGlideShared`.
 - `scripts/build_linux_packages.sh` packages an existing Linux binary into `.deb` and `.rpm` with `nfpm`.
 - `scripts/build_windows_packages.ps1` packages an existing Windows app folder into `.zip` and, when WiX is installed, `.msi`.
@@ -73,7 +74,7 @@ The work added here prepares packaging without hiding that constraint:
 
 ### Porting Plan
 
-1. Connect the future Linux/Windows UIs to `JSONClipboardHistoryStore`, then replace only the platform services.
+1. Connect the future Linux/Windows UIs to `JSONClipboardHistoryStore` and `ClipboardHistoryViewState`, then replace only the platform services.
 2. Replace macOS services with platform interfaces: clipboard, global hotkey, OCR, image storage, notifications, and URL opening.
 3. Implement a Linux UI with GTK/libadwaita or Qt, then a Windows UI with WinUI, Qt, or a thin native layer.
 4. Produce a Linux binary at `dist/linux/PasteGlide` and a Windows folder at `dist/windows/PasteGlide/PasteGlide.exe`.
@@ -88,6 +89,7 @@ swift run PasteGlidePortable classify "https://example.com"
 swift run PasteGlidePortable search-demo "type:text pinned:true invoice"
 swift run PasteGlidePortable settings-demo
 swift run PasteGlidePortable store-demo
+swift run PasteGlidePortable view-demo "type:text invoice"
 ```
 
 ### Automated Packaging
