@@ -18,7 +18,7 @@ jobs:
     container: swift:6.0-jammy
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build portable executable
         run: |
@@ -32,7 +32,9 @@ jobs:
         run: |
           apt-get update
           apt-get install -y curl
-          curl -sSfL https://raw.githubusercontent.com/goreleaser/nfpm/main/www/docs/install.sh | sh -s -- -b /usr/local/bin
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' > /etc/apt/sources.list.d/goreleaser.list
+          apt-get update
+          apt-get install -y nfpm
 
       - name: Package Linux artifacts
         run: |
@@ -42,7 +44,7 @@ jobs:
           VERSION="$VERSION" ./scripts/build_linux_packages.sh dist/linux/PasteGlide
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pasteglide-linux-packages
           path: |
@@ -54,13 +56,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Swift
         shell: pwsh
         run: |
           winget install --id Swift.Toolchain -e --source winget --accept-package-agreements --accept-source-agreements
-          $swift = Get-ChildItem "C:\Program Files\Swift\Toolchains" -Recurse -Filter swift.exe | Select-Object -First 1
+          $swiftSearchRoots = @(
+            "$env:LOCALAPPDATA\Programs\Swift",
+            "$env:ProgramFiles\Swift",
+            "${env:ProgramFiles(x86)}\Swift"
+          )
+          $swift = Get-ChildItem $swiftSearchRoots -Recurse -Filter swift.exe -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $swift) {
             throw "Swift executable was not found after installation."
           }
@@ -89,7 +96,7 @@ jobs:
           ./scripts/build_windows_packages.ps1 -AppDir dist/windows/PasteGlide -Version $version
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pasteglide-windows-packages
           path: |
