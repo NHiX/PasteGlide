@@ -58,8 +58,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "PasteGlide"
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = item.button {
+            button.image = makeStatusBarIcon()
+            button.imagePosition = .imageOnly
+            button.toolTip = "PasteGlide"
+            button.setAccessibilityLabel("PasteGlide")
+        }
         let menu = NSMenu()
         menu.addItem(menuItem(title: "Afficher l'historique", action: #selector(togglePanel), keyEquivalent: ""))
         menu.addItem(menuItem(title: "Préférences", action: #selector(showPreferences), keyEquivalent: ","))
@@ -72,6 +77,40 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(quitItem)
         item.menu = menu
         statusItem = item
+    }
+
+    private func makeStatusBarIcon() -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18))
+        image.lockFocus()
+
+        NSColor.black.setFill()
+
+        let clipboard = NSBezierPath(roundedRect: NSRect(x: 4, y: 3, width: 10, height: 12), xRadius: 2, yRadius: 2)
+        clipboard.fill()
+
+        NSColor.white.setFill()
+        let sheet = NSBezierPath(roundedRect: NSRect(x: 5.5, y: 4.5, width: 7, height: 8.5), xRadius: 1, yRadius: 1)
+        sheet.fill()
+
+        NSColor.black.setFill()
+        let clip = NSBezierPath(roundedRect: NSRect(x: 6, y: 13, width: 6, height: 2.2), xRadius: 1, yRadius: 1)
+        clip.fill()
+
+        for y in [10.5, 8.2, 5.9] {
+            let card = NSBezierPath(roundedRect: NSRect(x: 6.7, y: y, width: 5.4, height: 1.1), xRadius: 0.5, yRadius: 0.5)
+            card.fill()
+        }
+
+        let glide = NSBezierPath()
+        glide.lineWidth = 1.4
+        glide.lineCapStyle = .round
+        glide.move(to: NSPoint(x: 2.5, y: 5))
+        glide.curve(to: NSPoint(x: 8.5, y: 3.3), controlPoint1: NSPoint(x: 4, y: 3.8), controlPoint2: NSPoint(x: 6.5, y: 3.1))
+        glide.stroke()
+
+        image.unlockFocus()
+        image.isTemplate = true
+        return image
     }
 
     private func menuItem(title: String, action: Selector, keyEquivalent: String) -> NSMenuItem {
