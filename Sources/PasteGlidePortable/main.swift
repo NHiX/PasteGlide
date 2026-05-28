@@ -23,6 +23,8 @@ struct PasteGlidePortableCLI {
             return searchDemo(Array(arguments.dropFirst()))
         case "settings-demo":
             return settingsDemo()
+        case "store-demo":
+            return storeDemo()
         case "help", "--help", "-h":
             printUsage()
             return 0
@@ -97,6 +99,25 @@ struct PasteGlidePortableCLI {
         return 0
     }
 
+    private func storeDemo() -> Int32 {
+        do {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("PasteGlidePortable-\(UUID().uuidString)", isDirectory: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let store = JSONClipboardHistoryStore(fileURL: directory.appendingPathComponent("history.json"), historyLimit: 10)
+            try store.insert(kind: .text, content: "Portable history item", preview: "Portable history item")
+            try store.insert(kind: .url, content: "https://example.com", preview: "https://example.com")
+            let items = try store.loadItems()
+            output("items=\(items.count)")
+            output("archiveVersion=\(try store.exportArchive().version)")
+            output("path=\(store.fileURL.path)")
+            return 0
+        } catch {
+            output("store-demo failed: \(error)")
+            return 1
+        }
+    }
+
     private func printUsage() {
         output("""
         PasteGlidePortable
@@ -105,6 +126,7 @@ struct PasteGlidePortableCLI {
           classify <text>       Classify text with the shared PasteGlide classifier.
           search-demo <query>   Run the shared search engine against demo items.
           settings-demo         Print normalized shared default settings.
+          store-demo            Write and read a portable JSON history store.
           help                  Show this help.
         """)
     }

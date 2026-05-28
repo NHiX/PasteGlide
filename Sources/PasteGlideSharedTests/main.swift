@@ -138,6 +138,102 @@ func testClipboardArchiveDecodesLegacyArrayExports() throws {
     try expect(items[0].createdAt == Date(timeIntervalSince1970: 1_700_000_100), "legacy archive should decode creation date")
 }
 
+func testJSONClipboardHistoryStorePersistsAndDeduplicatesItems() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("PasteGlideSharedTests-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = JSONClipboardHistoryStore(
+        fileURL: directory.appendingPathComponent("history.json"),
+        historyLimit: 2,
+        now: { Date(timeIntervalSince1970: 1_700_000_200) }
+    )
+
+    let first = try store.insert(kind: .text, content: "Alpha", preview: "Alpha")
+    _ = try store.insert(kind: .url, content: "https://example.com", preview: "https://example.com")
+    let duplicate = try store.insert(kind: .text, content: "Alpha", preview: "Alpha updated")
+    let items = try store.loadItems()
+
+    try expect(first.contentHash == duplicate.contentHash, "duplicate content should produce the same hash")
+    try expect(items.count == 2, "history limit should keep two unique unpinned items")
+    try expect(items[0].preview == "Alpha updated", "latest duplicate should replace the older item")
+    try expect(items[0].id > first.id, "replacement should get a fresh portable id")
+}
+
+func testJSONClipboardHistoryStorePreservesPinnedAndAppliesRetention() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("PasteGlideSharedTests-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let now = Date(timeIntervalSince1970: 1_700_000_300)
+    let store = JSONClipboardHistoryStore(
+        fileURL: directory.appendingPathComponent("history.json"),
+        historyLimit: 10,
+        retentionDays: 1,
+        now: { now }
+    )
+    let pinnedOld = ClipboardItem(
+        id: 1,
+        kind: .text,
+        content: "Pinned old",
+        preview: "Pinned old",
+        ocrText: "",
+        isPinned: true,
+        createdAt: now.addingTimeInterval(-172_800),
+        contentHash: "pinned-old"
+    )
+    let unpinnedOld = ClipboardItem(
+        id: 2,
+        kind: .text,
+        content: "Unpinned old",
+        preview: "Unpinned old",
+        ocrText: "",
+        isPinned: false,
+        createdAt: now.addingTimeInterval(-172_800),
+        contentHash: "unpinned-old"
+    )
+    let recent = ClipboardItem(
+        id: 3,
+        kind: .text,
+        content: "Recent",
+        preview: "Recent",
+        ocrText: "",
+        isPinned: false,
+        createdAt: now.addingTimeInterval(-60),
+        contentHash: "recent"
+    )
+
+    try store.saveItems([pinnedOld, unpinnedOld, recent])
+    let items = try store.loadItems()
+    try expect(items.map(\.contentHash) == ["pinned-old", "recent"], "retention should keep pinned items and recent unpinned items")
+
+    try store.setPinned(id: 3, isPinned: true)
+    let pinnedItems = try store.loadItems()
+    try expect(pinnedItems.first { $0.id == 3 }?.isPinned == true, "setPinned should update the item")
+}
+
+func testJSONClipboardHistoryStoreImportsArchives() throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("PasteGlideSharedTests-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = JSONClipboardHistoryStore(fileURL: directory.appendingPathComponent("history.json"))
+    let archive = ClipboardArchive(items: [
+        ClipboardArchiveItem(
+            kind: .text,
+            content: "Imported",
+            preview: "Imported",
+            ocrText: "",
+            isPinned: false,
+            createdAt: 1_700_000_400,
+            contentHash: ""
+        )
+    ])
+
+    try store.importArchive(archive)
+    let exported = try store.exportArchive()
+    try expect(exported.items.count == 1, "store should import one archive item")
+    try expect(exported.items[0].content == "Imported", "store should preserve imported content")
+    try expect(!exported.items[0].contentHash.isEmpty, "store should fill missing hashes during import")
+}
+
 func testPanelPositionSharedLayoutMetadata() throws {
     try expect(PanelPosition.bottom.title == "Bas", "bottom title should stay localized")
     try expect(PanelPosition.top.isVertical == false, "top layout should be horizontal")
@@ -186,6 +282,9 @@ let tests: [(String, () throws -> Void)] = [
     ("sharedSearchParsesOperatorsAndFiltersItems", testSearchParsesOperatorsAndFiltersItems),
     ("sharedClipboardArchiveRoundTripsPortableItems", testClipboardArchiveRoundTripsPortableItems),
     ("sharedClipboardArchiveDecodesLegacyArrayExports", testClipboardArchiveDecodesLegacyArrayExports),
+    ("sharedJSONClipboardHistoryStorePersistsAndDeduplicatesItems", testJSONClipboardHistoryStorePersistsAndDeduplicatesItems),
+    ("sharedJSONClipboardHistoryStorePreservesPinnedAndAppliesRetention", testJSONClipboardHistoryStorePreservesPinnedAndAppliesRetention),
+    ("sharedJSONClipboardHistoryStoreImportsArchives", testJSONClipboardHistoryStoreImportsArchives),
     ("sharedPanelPositionSharedLayoutMetadata", testPanelPositionSharedLayoutMetadata),
     ("sharedSettingsRulesNormalizePortablePreferences", testSettingsRulesNormalizePortablePreferences),
     ("sharedSettingsRulesMatchExcludedApplications", testSettingsRulesMatchExcludedApplications)
