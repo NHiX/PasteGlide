@@ -11,6 +11,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   linux:
     name: Linux .deb and .rpm
@@ -115,3 +118,48 @@ jobs:
           path: |
             dist/*.msi
             dist/*.zip
+
+  release:
+    name: Attach portable packages to release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - linux
+      - windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: pasteglide-linux-packages
+          path: dist/release
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: pasteglide-windows-packages
+          path: dist/release
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          cat > release-notes.md <<'NOTES'
+          FR
+          - Ajoute les paquets portables Linux et Windows generes automatiquement.
+          - Linux: .deb et .rpm.
+          - Windows: .msi et .zip.
+          - Ces paquets valident la chaine multiplateforme portable; l'application graphique native Linux/Windows reste a porter.
+
+          EN
+          - Adds automatically generated portable Linux and Windows packages.
+          - Linux: .deb and .rpm.
+          - Windows: .msi and .zip.
+          - These packages validate the portable cross-platform chain; the native Linux/Windows graphical app still needs to be ported.
+          NOTES
+
+          if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            gh release create "${TAG_NAME}" --title "PasteGlide" --notes-file release-notes.md
+          fi
+
+          gh release upload "${TAG_NAME}" dist/release/* --clobber

@@ -38,6 +38,8 @@ Le workflow GitHub Actions `Portable Packages` construit ce binaire portable en 
 - Linux: `.deb` et `.rpm`
 - Windows: `.zip` et `.msi`
 
+Quand le workflow est declenche par un tag `v*`, ces quatre paquets sont aussi attaches a la release GitHub `PasteGlide` avec des notes FR/EN, sans date ni heure dans le nom de release.
+
 Ces paquets valident la chaine de compilation/packaging multiplateforme. Ils ne remplacent pas encore l'application graphique complete tant que les UI Linux et Windows ne sont pas implementees.
 
 ### Commandes attendues apres portage
@@ -91,6 +93,8 @@ The `Portable Packages` GitHub Actions workflow builds this portable binary in n
 
 - Linux: `.deb` and `.rpm`
 - Windows: `.zip` and `.msi`
+
+When the workflow is triggered by a `v*` tag, these four packages are also attached to the `PasteGlide` GitHub release with FR/EN notes, without a date or time in the release name.
 
 These packages validate the cross-platform build/packaging chain. They do not replace the complete graphical app until the Linux and Windows UIs are implemented.
 

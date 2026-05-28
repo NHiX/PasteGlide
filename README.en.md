@@ -40,7 +40,7 @@ Also build the `PasteGlide.app` zip published with releases:
 
 GitHub releases publish `PasteGlide.dmg` and `PasteGlide.app.zip`. The DMG contains `PasteGlide.app` and an `Applications` shortcut for drag-and-drop installation. The app is ad-hoc signed so the macOS bundle stays consistent; without an Apple Developer ID certificate and notarization, macOS may still require right-clicking the app and choosing `Open`.
 
-PasteGlide does not have Linux or Windows binaries yet. The cross-platform packaging scripts are ready for a future native port, but they require a real Linux or Windows binary first. See [docs/PORTABILITY.md](docs/PORTABILITY.md).
+The `Portable Packages` GitHub Actions workflow also produces portable Linux and Windows packages: `.deb`, `.rpm`, `.msi`, and `.zip`. These packages ship the `PasteGlidePortable` binary, validating the shared cross-platform core; the native Linux/Windows graphical app still needs to be ported. See [docs/PORTABILITY.md](docs/PORTABILITY.md).
 
 To produce an Apple-notarized DMG, you need an Apple Developer account, a `Developer ID Application` certificate, and a stored `notarytool` keychain profile. Then run:
 
