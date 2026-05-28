@@ -20,6 +20,28 @@ func sqliteTransient() -> sqlite3_destructor_type {
     unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 }
 
+public enum PanelPosition: String, CaseIterable {
+    case bottom
+    case top
+    case left
+    case right
+    case center
+
+    public var title: String {
+        switch self {
+        case .bottom: "Bas"
+        case .top: "Haut"
+        case .left: "Gauche"
+        case .right: "Droite"
+        case .center: "Milieu"
+        }
+    }
+
+    var isVertical: Bool {
+        self == .left || self == .right || self == .center
+    }
+}
+
 public final class AppSettings: @unchecked Sendable {
     public static let shared = AppSettings()
     private let defaults = UserDefaults.standard
@@ -52,6 +74,14 @@ public final class AppSettings: @unchecked Sendable {
     public var panelWidthPercent: Int {
         get { defaults.integer(forKey: "panelWidthPercent") == 0 ? 86 : defaults.integer(forKey: "panelWidthPercent") }
         set { defaults.set(min(max(newValue, 50), 95), forKey: "panelWidthPercent") }
+    }
+
+    public var panelPosition: PanelPosition {
+        get {
+            let rawValue = defaults.string(forKey: "panelPosition") ?? PanelPosition.bottom.rawValue
+            return PanelPosition(rawValue: rawValue) ?? .bottom
+        }
+        set { defaults.set(newValue.rawValue, forKey: "panelPosition") }
     }
 
     func isExcluded(application: NSRunningApplication?) -> Bool {

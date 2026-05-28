@@ -19,6 +19,10 @@ final class KeyHandlingPanel: NSPanel {
             keyController?.selectPrevious()
         case UInt16(kVK_RightArrow):
             keyController?.selectNext()
+        case UInt16(kVK_UpArrow):
+            keyController?.selectPrevious()
+        case UInt16(kVK_DownArrow):
+            keyController?.selectNext()
         case UInt16(kVK_Return), UInt16(kVK_ANSI_KeypadEnter):
             keyController?.copySelectedItem()
         case UInt16(kVK_Delete), UInt16(kVK_ForwardDelete):
@@ -36,11 +40,24 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
     private let database: ClipboardDatabase
     private let pasteboard = NSPasteboard.general
     private lazy var panel = makePanel()
+    private let scrollView = NSScrollView()
     private let stackView = NSStackView()
     private let searchField = NSSearchField()
+    private let statsLabel = NSTextField(labelWithString: "")
+    private let lastCardLabel = NSTextField(labelWithString: "")
+    private let lastCardDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }()
     private var allItems: [ClipboardItem] = []
     private var visibleItems: [ClipboardItem] = []
     private var cardViews: [CardView] = []
+    private var stackSizingConstraint: NSLayoutConstraint?
+    private var horizontalStatsConstraints: [NSLayoutConstraint] = []
+    private var verticalStatsConstraints: [NSLayoutConstraint] = []
+    private var scrollTopConstraint: NSLayoutConstraint?
     private var selectedIndex = 0
 
     init(database: ClipboardDatabase) {
@@ -53,6 +70,7 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
         if panel.isVisible {
             panel.orderOut(nil)
         } else {
+            applyPanelLayout()
             reload()
             positionPanel()
             panel.makeKeyAndOrderFront(nil)
@@ -61,13 +79,15 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
 
     func reloadIfVisible() {
         if panel.isVisible {
+            applyPanelLayout()
+            positionPanel()
             reload()
         }
     }
 
     private func makePanel() -> NSPanel {
         let panel = KeyHandlingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 980, height: 188),
+            contentRect: NSRect(x: 0, y: 0, width: 980, height: 214),
             styleMask: [.titled, .utilityWindow, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -99,7 +119,19 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
         searchField.action = #selector(searchChanged(_:))
         searchField.translatesAutoresizingMaskIntoConstraints = false
 
-        let scrollView = NSScrollView()
+        statsLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        statsLabel.textColor = .secondaryLabelColor
+        statsLabel.lineBreakMode = .byTruncatingTail
+        statsLabel.maximumNumberOfLines = 1
+        statsLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        lastCardLabel.font = .systemFont(ofSize: 12)
+        lastCardLabel.textColor = .tertiaryLabelColor
+        lastCardLabel.alignment = .right
+        lastCardLabel.lineBreakMode = .byTruncatingHead
+        lastCardLabel.maximumNumberOfLines = 1
+        lastCardLabel.translatesAutoresizingMaskIntoConstraints = false
+
         scrollView.hasHorizontalScroller = true
         scrollView.hasVerticalScroller = false
         scrollView.drawsBackground = false
@@ -112,6 +144,8 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
 
         scrollView.documentView = stackView
         visualEffect.addSubview(searchField)
+        visualEffect.addSubview(statsLabel)
+        visualEffect.addSubview(lastCardLabel)
         visualEffect.addSubview(scrollView)
         panel.contentView = visualEffect
 
@@ -120,16 +154,31 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
             searchField.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor, constant: -16),
             searchField.topAnchor.constraint(equalTo: visualEffect.topAnchor, constant: 14),
 
+            statsLabel.leadingAnchor.constraint(equalTo: searchField.leadingAnchor),
+            statsLabel.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 6),
+
             scrollView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 8),
-            scrollView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor),
-            stackView.heightAnchor.constraint(equalTo: scrollView.contentView.heightAnchor)
+            scrollView.bottomAnchor.constraint(equalTo: visualEffect.bottomAnchor)
         ])
+        horizontalStatsConstraints = [
+            statsLabel.trailingAnchor.constraint(lessThanOrEqualTo: lastCardLabel.leadingAnchor, constant: -12),
+            lastCardLabel.trailingAnchor.constraint(equalTo: searchField.trailingAnchor),
+            lastCardLabel.centerYAnchor.constraint(equalTo: statsLabel.centerYAnchor),
+            lastCardLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 180)
+        ]
+        verticalStatsConstraints = [
+            statsLabel.trailingAnchor.constraint(equalTo: searchField.trailingAnchor),
+            lastCardLabel.leadingAnchor.constraint(equalTo: searchField.leadingAnchor),
+            lastCardLabel.trailingAnchor.constraint(equalTo: searchField.trailingAnchor),
+            lastCardLabel.topAnchor.constraint(equalTo: statsLabel.bottomAnchor, constant: 2)
+        ]
+        applyPanelLayout()
     }
 
     private func reload() {
         allItems = database.fetchRecent()
+        updateStats()
         render(items: filteredItems())
     }
 
@@ -176,14 +225,88 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
         }
     }
 
+    private func updateStats() {
+        let total = allItems.count
+        let countsByKind = Dictionary(grouping: allItems, by: \.kind).mapValues(\.count)
+        let totalText = "\(total) \(total == 1 ? "objet mémorisé" : "objets mémorisés")"
+        let kindTexts = ClipboardKind.allCases.map { kind in
+            "\(kind.title): \(countsByKind[kind, default: 0])"
+        }
+        if AppSettings.shared.panelPosition.isVertical {
+            statsLabel.stringValue = [
+                totalText,
+                kindTexts.prefix(3).joined(separator: " · "),
+                kindTexts.dropFirst(3).joined(separator: " · ")
+            ]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        } else {
+            statsLabel.stringValue = ([totalText] + kindTexts).joined(separator: " · ")
+        }
+
+        if let latestItem = allItems.max(by: { $0.createdAt < $1.createdAt }) {
+            lastCardLabel.stringValue = "Dernière carte : \(lastCardDateFormatter.string(from: latestItem.createdAt))"
+        } else {
+            lastCardLabel.stringValue = "Dernière carte : aucune"
+        }
+    }
+
+    private func applyPanelLayout() {
+        let isVertical = AppSettings.shared.panelPosition.isVertical
+        stackView.orientation = isVertical ? .vertical : .horizontal
+        stackView.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+        scrollView.hasHorizontalScroller = !isVertical
+        scrollView.hasVerticalScroller = isVertical
+        statsLabel.lineBreakMode = isVertical ? .byWordWrapping : .byTruncatingTail
+        statsLabel.maximumNumberOfLines = isVertical ? 3 : 1
+        lastCardLabel.alignment = isVertical ? .left : .right
+        lastCardLabel.lineBreakMode = isVertical ? .byTruncatingTail : .byTruncatingHead
+
+        NSLayoutConstraint.deactivate(horizontalStatsConstraints + verticalStatsConstraints)
+        NSLayoutConstraint.activate(isVertical ? verticalStatsConstraints : horizontalStatsConstraints)
+
+        stackSizingConstraint?.isActive = false
+        stackSizingConstraint = isVertical
+            ? stackView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor)
+            : stackView.heightAnchor.constraint(equalTo: scrollView.contentView.heightAnchor)
+        stackSizingConstraint?.isActive = true
+
+        scrollTopConstraint?.isActive = false
+        scrollTopConstraint = scrollView.topAnchor.constraint(equalTo: isVertical ? lastCardLabel.bottomAnchor : statsLabel.bottomAnchor, constant: 8)
+        scrollTopConstraint?.isActive = true
+        updateStats()
+    }
+
     private func positionPanel() {
         guard let screen = NSScreen.main else { return }
         let visible = screen.visibleFrame
-        let widthPercent = CGFloat(AppSettings.shared.panelWidthPercent) / 100
-        let width = min(max(visible.width * widthPercent, 680), 1280)
-        let height: CGFloat = 188
-        let x = visible.midX - width / 2
-        let y = visible.minY + 18
+        let position = AppSettings.shared.panelPosition
+        let margin: CGFloat = 18
+        let width: CGFloat
+        let height: CGFloat
+        let x: CGFloat
+        let y: CGFloat
+
+        if position.isVertical {
+            width = min(max(visible.width * 0.24, 360), 460)
+            height = min(max(visible.height * 0.82, 420), visible.height - margin * 2)
+            switch position {
+            case .left:
+                x = visible.minX + margin
+            case .right:
+                x = visible.maxX - width - margin
+            default:
+                x = visible.midX - width / 2
+            }
+            y = visible.midY - height / 2
+        } else {
+            let widthPercent = CGFloat(AppSettings.shared.panelWidthPercent) / 100
+            width = min(max(visible.width * widthPercent, 680), 1280)
+            height = 214
+            x = visible.midX - width / 2
+            y = position == .top ? visible.maxY - height - margin : visible.minY + margin
+        }
+
         panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
     }
 
