@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="PasteGlide"
+    Manufacturer="PasteGlide"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="9d60e13f-4a7d-4cf4-97e6-11ebeb18a55b"
+    Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of PasteGlide is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLFOLDER" Name="PasteGlide">
+        <Files Include="$(var.AppSource)\**" />
+      </Directory>
+    </StandardDirectory>
+  </Package>
+</Wix>

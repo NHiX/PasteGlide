@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PasteGlide
+Comment=Local clipboard history manager
+Exec=pasteglide
+Icon=pasteglide
+Terminal=false
+Categories=Utility;
+StartupNotify=true

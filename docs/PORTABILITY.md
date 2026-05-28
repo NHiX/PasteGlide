@@ -1,0 +1,67 @@
+# PasteGlide Portability / Portabilite
+
+## FR
+
+PasteGlide est aujourd'hui une application macOS native. Le code utilise AppKit, Carbon, Vision.framework, `NSPasteboard`, `NSStatusBar`, `NSPanel` et les conventions d'installation macOS. Ces API n'existent pas sur Linux ou Windows, donc un paquet `.deb`, `.rpm`, `.msi` ou `.zip` ne peut pas etre produit correctement tant qu'un port natif n'existe pas.
+
+Le travail ajoute ici prepare le packaging sans masquer cette contrainte:
+
+- `scripts/build_linux_packages.sh` package un binaire Linux existant en `.deb` et `.rpm` via `nfpm`.
+- `scripts/build_windows_packages.ps1` package un dossier Windows existant en `.zip` et, si WiX est installe, en `.msi`.
+- `packaging/linux/pasteglide.desktop` fournit l'integration bureau Linux.
+- `packaging/windows/PasteGlide.wxs` fournit le manifeste WiX pour l'installeur Windows.
+
+### Plan de portage
+
+1. Extraire les modeles, la base SQLite, la classification, les preferences et l'import/export dans un module Swift sans AppKit.
+2. Remplacer les services macOS par des interfaces de plateforme: presse-papier, raccourci global, OCR, stockage d'images, notifications et ouverture de liens.
+3. Implementer une UI Linux avec GTK/libadwaita ou Qt, puis une UI Windows avec WinUI, Qt ou une fine couche native.
+4. Produire un binaire Linux `dist/linux/PasteGlide` et un dossier Windows `dist/windows/PasteGlide/PasteGlide.exe`.
+5. Lancer les scripts de packaging multiplateforme.
+
+### Commandes attendues apres portage
+
+Linux:
+
+```bash
+./scripts/build_linux_packages.sh dist/linux/PasteGlide
+```
+
+Windows PowerShell:
+
+```powershell
+./scripts/build_windows_packages.ps1 -AppDir dist/windows/PasteGlide
+```
+
+## EN
+
+PasteGlide is currently a native macOS app. The code uses AppKit, Carbon, Vision.framework, `NSPasteboard`, `NSStatusBar`, `NSPanel`, and macOS installation conventions. These APIs do not exist on Linux or Windows, so a useful `.deb`, `.rpm`, `.msi`, or `.zip` cannot be produced until native ports exist.
+
+The work added here prepares packaging without hiding that constraint:
+
+- `scripts/build_linux_packages.sh` packages an existing Linux binary into `.deb` and `.rpm` with `nfpm`.
+- `scripts/build_windows_packages.ps1` packages an existing Windows app folder into `.zip` and, when WiX is installed, `.msi`.
+- `packaging/linux/pasteglide.desktop` provides Linux desktop integration.
+- `packaging/windows/PasteGlide.wxs` provides the WiX installer manifest for Windows.
+
+### Porting Plan
+
+1. Extract models, SQLite storage, classification, preferences, and import/export into an AppKit-free Swift module.
+2. Replace macOS services with platform interfaces: clipboard, global hotkey, OCR, image storage, notifications, and URL opening.
+3. Implement a Linux UI with GTK/libadwaita or Qt, then a Windows UI with WinUI, Qt, or a thin native layer.
+4. Produce a Linux binary at `dist/linux/PasteGlide` and a Windows folder at `dist/windows/PasteGlide/PasteGlide.exe`.
+5. Run the cross-platform packaging scripts.
+
+### Expected Commands After Porting
+
+Linux:
+
+```bash
+./scripts/build_linux_packages.sh dist/linux/PasteGlide
+```
+
+Windows PowerShell:
+
+```powershell
+./scripts/build_windows_packages.ps1 -AppDir dist/windows/PasteGlide
+```

@@ -4,6 +4,8 @@ PasteGlide est un gestionnaire de presse-papier macOS natif écrit en Swift/AppK
 
 English documentation: [README.en.md](README.en.md)
 
+Portabilite Linux/Windows: [docs/PORTABILITY.md](docs/PORTABILITY.md)
+
 ## Prérequis
 
 - macOS 14 ou plus récent
@@ -37,6 +39,8 @@ Créer aussi le zip de `PasteGlide.app` publié avec les releases:
 ```
 
 Les releases GitHub publient `PasteGlide.dmg` et `PasteGlide.app.zip`. Le DMG contient `PasteGlide.app` et un raccourci `Applications` pour installer l'app par glisser-déposer. L'app est signée ad-hoc pour garder un bundle macOS cohérent; sans certificat Apple Developer ID et notarisation, macOS peut encore demander une ouverture via clic droit puis `Ouvrir`.
+
+PasteGlide n'a pas encore de binaire Linux ou Windows. Les scripts de packaging multiplateforme existent pour le futur port natif, mais ils exigent d'abord un binaire Linux ou Windows reel. Voir [docs/PORTABILITY.md](docs/PORTABILITY.md).
 
 Pour produire un DMG notarizé par Apple, il faut un compte Apple Developer, un certificat `Developer ID Application` et un profil `notarytool` enregistré dans le trousseau. Ensuite:
 
