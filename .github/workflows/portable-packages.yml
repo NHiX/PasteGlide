@@ -76,9 +76,20 @@ jobs:
       - name: Build portable executable
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          function Invoke-NativeCommand {
+            param([Parameter(ValueFromRemainingArguments = $true)][string[]] $Command)
+            & $Command[0] @($Command | Select-Object -Skip 1)
+            if ($LASTEXITCODE -ne 0) {
+              throw "$($Command -join ' ') failed with exit code $LASTEXITCODE"
+            }
+          }
           swift --version
-          swift build -c release --product PasteGlidePortable
+          Invoke-NativeCommand swift build -c release --product PasteGlidePortable
           $binPath = swift build -c release --product PasteGlidePortable --show-bin-path
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($binPath)) {
+            throw "SwiftPM did not return a release binary path."
+          }
           Write-Host "SwiftPM bin path: $binPath"
           New-Item -ItemType Directory -Force -Path dist/windows/PasteGlide | Out-Null
           $portableExe = Get-ChildItem $binPath -Recurse -File |

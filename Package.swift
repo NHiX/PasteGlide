@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-var platforms: [SupportedPlatform] = []
+var platforms: [SupportedPlatform]? = nil
 var targets: [Target] = [
     .target(
         name: "PasteGlideShared"
