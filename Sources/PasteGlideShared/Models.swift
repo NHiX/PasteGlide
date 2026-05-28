@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ClipboardKind: String, CaseIterable {
+public enum ClipboardKind: String, CaseIterable, Codable {
     case youtube
     case url
     case text

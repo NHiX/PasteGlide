@@ -81,6 +81,63 @@ func testSearchParsesOperatorsAndFiltersItems() throws {
     try expect(results.map(\.id) == [1], "search should keep only matching items")
 }
 
+func testClipboardArchiveRoundTripsPortableItems() throws {
+    let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let item = ClipboardItem(
+        id: 42,
+        kind: .image,
+        content: "base64-image",
+        preview: "Image 64x64",
+        ocrText: "texte reconnu",
+        isPinned: true,
+        createdAt: createdAt,
+        contentHash: "image-hash"
+    )
+
+    let archive = ClipboardArchive(clipboardItems: [item])
+    let data = try archive.encoded()
+    let json = String(data: data, encoding: .utf8) ?? ""
+    try expect(json.contains("\"version\""), "archive JSON should include a version")
+    try expect(json.contains("\"items\""), "archive JSON should include an items array")
+
+    let decoded = try ClipboardArchive.decoded(from: data)
+    let roundTripItems = decoded.clipboardItems()
+    try expect(decoded.version == ClipboardArchive.currentVersion, "archive should keep the current version")
+    try expect(roundTripItems.count == 1, "archive should round-trip one item")
+    try expect(roundTripItems[0].id == 42, "archive should preserve item id when present")
+    try expect(roundTripItems[0].kind == .image, "archive should preserve kind")
+    try expect(roundTripItems[0].content == "base64-image", "archive should preserve content")
+    try expect(roundTripItems[0].ocrText == "texte reconnu", "archive should preserve OCR text")
+    try expect(roundTripItems[0].isPinned, "archive should preserve pin state")
+    try expect(roundTripItems[0].createdAt == createdAt, "archive should preserve creation date")
+    try expect(roundTripItems[0].contentHash == "image-hash", "archive should preserve content hash")
+}
+
+func testClipboardArchiveDecodesLegacyArrayExports() throws {
+    let legacyJSON = """
+    [
+      {
+        "kind": "text",
+        "content": "Bonjour",
+        "preview": "Bonjour",
+        "ocrText": "",
+        "createdAt": 1700000100,
+        "contentHash": "text-hash",
+        "isPinned": false
+      }
+    ]
+    """
+
+    let archive = try ClipboardArchive.decoded(from: Data(legacyJSON.utf8))
+    let items = archive.clipboardItems()
+    try expect(archive.version == ClipboardArchive.currentVersion, "legacy arrays should be treated as current archive version")
+    try expect(items.count == 1, "legacy archive should decode one item")
+    try expect(items[0].id == 1, "legacy archive should assign a stable fallback id")
+    try expect(items[0].kind == .text, "legacy archive should decode kind")
+    try expect(items[0].content == "Bonjour", "legacy archive should decode content")
+    try expect(items[0].createdAt == Date(timeIntervalSince1970: 1_700_000_100), "legacy archive should decode creation date")
+}
+
 func testPanelPositionSharedLayoutMetadata() throws {
     try expect(PanelPosition.bottom.title == "Bas", "bottom title should stay localized")
     try expect(PanelPosition.top.isVertical == false, "top layout should be horizontal")
@@ -127,6 +184,8 @@ let tests: [(String, () throws -> Void)] = [
     ("sharedClassifierDetectsExpectedKinds", testClassifierDetectsExpectedKinds),
     ("sharedSearchHaystackUsesOCRButSkipsImageBase64", testSearchHaystackUsesOCRButSkipsImageBase64),
     ("sharedSearchParsesOperatorsAndFiltersItems", testSearchParsesOperatorsAndFiltersItems),
+    ("sharedClipboardArchiveRoundTripsPortableItems", testClipboardArchiveRoundTripsPortableItems),
+    ("sharedClipboardArchiveDecodesLegacyArrayExports", testClipboardArchiveDecodesLegacyArrayExports),
     ("sharedPanelPositionSharedLayoutMetadata", testPanelPositionSharedLayoutMetadata),
     ("sharedSettingsRulesNormalizePortablePreferences", testSettingsRulesNormalizePortablePreferences),
     ("sharedSettingsRulesMatchExcludedApplications", testSettingsRulesMatchExcludedApplications)

@@ -350,7 +350,7 @@ public final class ClipboardDatabase {
             throw databaseError("Export JSON impossible")
         }
 
-        var rows: [[String: Any]] = []
+        var items: [ClipboardArchiveItem] = []
         while sqlite3_step(statement) == SQLITE_ROW {
             let kind = sqlite3_column_text(statement, 0).map { String(cString: $0) } ?? ClipboardKind.text.rawValue
             var content = sqlite3_column_text(statement, 1).map { String(cString: $0) } ?? ""
@@ -358,35 +358,30 @@ public final class ClipboardDatabase {
             if content.isEmpty, !contentPath.isEmpty, let data = try? Data(contentsOf: URL(fileURLWithPath: contentPath)) {
                 content = data.base64EncodedString()
             }
-            rows.append([
-                "kind": kind,
-                "content": content,
-                "preview": sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? "",
-                "ocrText": sqlite3_column_text(statement, 3).map { String(cString: $0) } ?? "",
-                "createdAt": sqlite3_column_double(statement, 4),
-                "contentHash": sqlite3_column_text(statement, 5).map { String(cString: $0) } ?? "",
-                "isPinned": sqlite3_column_int(statement, 6) == 1
-            ])
+            items.append(
+                ClipboardArchiveItem(
+                    kind: ClipboardKind(rawValue: kind) ?? .text,
+                    content: content,
+                    preview: sqlite3_column_text(statement, 2).map { String(cString: $0) } ?? "",
+                    ocrText: sqlite3_column_text(statement, 3).map { String(cString: $0) } ?? "",
+                    isPinned: sqlite3_column_int(statement, 6) == 1,
+                    createdAt: sqlite3_column_double(statement, 4),
+                    contentHash: sqlite3_column_text(statement, 5).map { String(cString: $0) } ?? ""
+                )
+            )
         }
 
-        let data = try JSONSerialization.data(withJSONObject: rows, options: [.prettyPrinted, .sortedKeys])
+        let data = try ClipboardArchive(items: items).encoded()
         try data.write(to: destinationURL, options: .atomic)
     }
 
     func importJSON(from sourceURL: URL) throws {
         let data = try Data(contentsOf: sourceURL)
-        guard let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw databaseError("JSON invalide")
-        }
-        for row in rows {
-            guard let content = row["content"] as? String, !content.isEmpty else { continue }
-            let kind = row["kind"] as? String ?? ClipboardKind.text.rawValue
-            let preview = row["preview"] as? String ?? content
-            let ocrText = row["ocrText"] as? String ?? ""
-            let createdAt = row["createdAt"] as? Double ?? Date().timeIntervalSince1970
-            let hash = row["contentHash"] as? String ?? hashContent("\(kind):\(content)")
-            let isPinned = row["isPinned"] as? Bool ?? false
-            try insertImported(kind: kind, content: content, preview: preview, ocrText: ocrText, createdAt: createdAt, hash: hash, isPinned: isPinned)
+        let archive = try ClipboardArchive.decoded(from: data)
+        for item in archive.items {
+            guard !item.content.isEmpty else { continue }
+            let hash = item.contentHash.isEmpty ? hashContent("\(item.kind.rawValue):\(item.content)") : item.contentHash
+            try insertImported(kind: item.kind.rawValue, content: item.content, preview: item.preview, ocrText: item.ocrText, createdAt: item.createdAt, hash: hash, isPinned: item.isPinned)
         }
         try applyRetention()
     }
