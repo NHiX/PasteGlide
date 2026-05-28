@@ -212,6 +212,29 @@ public final class ClipboardDatabase {
         }
     }
 
+    public func delete(kind: ClipboardKind) throws {
+        let sql = "DELETE FROM clipboard_items WHERE kind = ?;"
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            throw databaseError("Préparation DELETE type impossible")
+        }
+        sqlite3_bind_text(statement, 1, kind.rawValue, -1, sqliteTransient())
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw databaseError("Suppression du type impossible")
+        }
+    }
+
+    public func deleteAll() throws {
+        try execute("DELETE FROM clipboard_items;")
+    }
+
+    public func deleteOlderThan(days: Int) throws {
+        guard days > 0 else { return }
+        let cutoff = Date().addingTimeInterval(TimeInterval(-days * 24 * 60 * 60)).timeIntervalSince1970
+        try execute("DELETE FROM clipboard_items WHERE is_pinned = 0 AND created_at < \(cutoff);")
+    }
+
     public func setPinned(id: Int64, isPinned: Bool) throws {
         let sql = "UPDATE clipboard_items SET is_pinned = ? WHERE id = ?;"
         var statement: OpaquePointer?

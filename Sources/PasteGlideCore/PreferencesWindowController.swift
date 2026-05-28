@@ -15,12 +15,17 @@ final class PreferencesWindowController: NSWindowController {
     private let panelWidthField = NSTextField()
     private let panelPositionPopUp = NSPopUpButton()
     private let ocrCheckbox = NSButton(checkboxWithTitle: "Activer l'OCR des images", target: nil, action: nil)
+    private let capturePasswordsCheckbox = NSButton(checkboxWithTitle: "Mémoriser les mots de passe probables", target: nil, action: nil)
+    private let maskSensitiveCheckbox = NSButton(checkboxWithTitle: "Masquer les contenus sensibles dans les cartes", target: nil, action: nil)
     private let excludedAppsField = NSTextField()
     var onSave: (() -> Void)?
+    var onDeleteAll: (() -> Void)?
+    var onDeleteImages: (() -> Void)?
+    var onDeleteOldItems: (() -> Void)?
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 330),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 430),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -45,11 +50,19 @@ final class PreferencesWindowController: NSWindowController {
         PanelPosition.allCases.forEach { panelPositionPopUp.addItem(withTitle: $0.title) }
         panelPositionPopUp.selectItem(withTitle: settings.panelPosition.title)
         ocrCheckbox.state = settings.isOCREnabled ? .on : .off
+        capturePasswordsCheckbox.state = settings.shouldCapturePasswords ? .on : .off
+        maskSensitiveCheckbox.state = settings.shouldMaskSensitiveContent ? .on : .off
         excludedAppsField.stringValue = settings.excludedApplications.joined(separator: ", ")
         excludedAppsField.placeholderString = "Bundle id ou nom d'app, séparés par des virgules"
 
         let saveButton = NSButton(title: "Enregistrer", target: self, action: #selector(save))
         saveButton.bezelStyle = .rounded
+        let deleteImagesButton = NSButton(title: "Supprimer les images", target: self, action: #selector(deleteImages))
+        deleteImagesButton.bezelStyle = .rounded
+        let deleteOldButton = NSButton(title: "Supprimer > rétention", target: self, action: #selector(deleteOldItems))
+        deleteOldButton.bezelStyle = .rounded
+        let deleteAllButton = NSButton(title: "Vider l'historique", target: self, action: #selector(deleteAll))
+        deleteAllButton.bezelStyle = .rounded
 
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -63,7 +76,10 @@ final class PreferencesWindowController: NSWindowController {
         stack.addArrangedSubview(row(label: "Largeur panneau (%)", field: panelWidthField))
         stack.addArrangedSubview(row(label: "Position du panneau", control: panelPositionPopUp))
         stack.addArrangedSubview(ocrCheckbox)
+        stack.addArrangedSubview(capturePasswordsCheckbox)
+        stack.addArrangedSubview(maskSensitiveCheckbox)
         stack.addArrangedSubview(row(label: "Apps exclues", field: excludedAppsField))
+        stack.addArrangedSubview(buttonRow([deleteImagesButton, deleteOldButton, deleteAllButton]))
         stack.addArrangedSubview(saveButton)
 
         contentView.addSubview(stack)
@@ -76,8 +92,8 @@ final class PreferencesWindowController: NSWindowController {
 
     private func row(label: String, field: NSTextField) -> NSStackView {
         let title = NSTextField(labelWithString: label)
-        title.widthAnchor.constraint(equalToConstant: 170).isActive = true
-        field.widthAnchor.constraint(equalToConstant: 230).isActive = true
+        title.widthAnchor.constraint(equalToConstant: 190).isActive = true
+        field.widthAnchor.constraint(equalToConstant: 250).isActive = true
         let row = NSStackView(views: [title, field])
         row.orientation = .horizontal
         row.spacing = 12
@@ -86,11 +102,18 @@ final class PreferencesWindowController: NSWindowController {
 
     private func row(label: String, control: NSControl) -> NSStackView {
         let title = NSTextField(labelWithString: label)
-        title.widthAnchor.constraint(equalToConstant: 170).isActive = true
-        control.widthAnchor.constraint(equalToConstant: 230).isActive = true
+        title.widthAnchor.constraint(equalToConstant: 190).isActive = true
+        control.widthAnchor.constraint(equalToConstant: 250).isActive = true
         let row = NSStackView(views: [title, control])
         row.orientation = .horizontal
         row.spacing = 12
+        return row
+    }
+
+    private func buttonRow(_ buttons: [NSButton]) -> NSStackView {
+        let row = NSStackView(views: buttons)
+        row.orientation = .horizontal
+        row.spacing = 8
         return row
     }
 
@@ -105,8 +128,22 @@ final class PreferencesWindowController: NSWindowController {
             settings.panelPosition = position
         }
         settings.isOCREnabled = ocrCheckbox.state == .on
+        settings.shouldCapturePasswords = capturePasswordsCheckbox.state == .on
+        settings.shouldMaskSensitiveContent = maskSensitiveCheckbox.state == .on
         settings.excludedApplications = excludedAppsField.stringValue.split(separator: ",").map(String.init)
         onSave?()
         window?.orderOut(nil)
+    }
+
+    @objc private func deleteAll() {
+        onDeleteAll?()
+    }
+
+    @objc private func deleteImages() {
+        onDeleteImages?()
+    }
+
+    @objc private func deleteOldItems() {
+        onDeleteOldItems?()
     }
 }

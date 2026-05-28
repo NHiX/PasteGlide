@@ -13,6 +13,10 @@ final class CardView: NSControl {
     private let onSelect: (ClipboardItem) -> Void
     private let onDelete: (ClipboardItem) -> Void
     private let onTogglePin: (ClipboardItem) -> Void
+    private let onCopyPlainText: (ClipboardItem) -> Void
+    private let onOpen: (ClipboardItem) -> Void
+    private let onSaveImage: (ClipboardItem) -> Void
+    private let onDeleteKind: (ClipboardItem) -> Void
     private var revealed = false
     private let previewLabel = NSTextField(labelWithString: "")
     private var hoverTrackingArea: NSTrackingArea?
@@ -21,11 +25,24 @@ final class CardView: NSControl {
         didSet { updateSelectionStyle() }
     }
 
-    init(item: ClipboardItem, onSelect: @escaping (ClipboardItem) -> Void, onDelete: @escaping (ClipboardItem) -> Void, onTogglePin: @escaping (ClipboardItem) -> Void) {
+    init(
+        item: ClipboardItem,
+        onSelect: @escaping (ClipboardItem) -> Void,
+        onDelete: @escaping (ClipboardItem) -> Void,
+        onTogglePin: @escaping (ClipboardItem) -> Void,
+        onCopyPlainText: @escaping (ClipboardItem) -> Void,
+        onOpen: @escaping (ClipboardItem) -> Void,
+        onSaveImage: @escaping (ClipboardItem) -> Void,
+        onDeleteKind: @escaping (ClipboardItem) -> Void
+    ) {
         self.item = item
         self.onSelect = onSelect
         self.onDelete = onDelete
         self.onTogglePin = onTogglePin
+        self.onCopyPlainText = onCopyPlainText
+        self.onOpen = onOpen
+        self.onSaveImage = onSaveImage
+        self.onDeleteKind = onDeleteKind
         super.init(frame: .zero)
         self.identifier = NSUserInterfaceItemIdentifier(String(item.id))
         setup()
@@ -41,20 +58,46 @@ final class CardView: NSControl {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        if item.kind == .password {
-            revealed.toggle()
-            previewLabel.stringValue = revealed ? item.content : item.preview
-            return
-        }
         NSMenu.popUpContextMenu(contextMenu, with: event, for: self)
     }
 
     private var contextMenu: NSMenu {
         let menu = NSMenu()
+        if item.kind == .password {
+            menu.addItem(NSMenuItem(title: revealed ? "Masquer" : "Révéler", action: #selector(toggleReveal), keyEquivalent: ""))
+        }
+        menu.addItem(NSMenuItem(title: "Copier en texte brut", action: #selector(copyPlainText), keyEquivalent: ""))
+        if item.kind == .image {
+            menu.addItem(NSMenuItem(title: "Enregistrer l'image", action: #selector(saveImage), keyEquivalent: ""))
+        } else if URL(string: item.content)?.scheme != nil {
+            menu.addItem(NSMenuItem(title: "Ouvrir le lien", action: #selector(openItem), keyEquivalent: ""))
+        }
         menu.addItem(NSMenuItem(title: item.isPinned ? "Désépingler" : "Épingler", action: #selector(togglePin), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Supprimer", action: #selector(deleteCard), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Supprimer tous les éléments \(item.kind.title)", action: #selector(deleteKind), keyEquivalent: ""))
         menu.items.forEach { $0.target = self }
         return menu
+    }
+
+    @objc private func toggleReveal() {
+        revealed.toggle()
+        previewLabel.stringValue = revealed ? item.content : item.preview
+    }
+
+    @objc private func copyPlainText() {
+        onCopyPlainText(item)
+    }
+
+    @objc private func openItem() {
+        onOpen(item)
+    }
+
+    @objc private func saveImage() {
+        onSaveImage(item)
+    }
+
+    @objc private func deleteKind() {
+        onDeleteKind(item)
     }
 
     @objc private func togglePin() {
@@ -107,7 +150,7 @@ final class CardView: NSControl {
         title.toolTip = tooltipText
         title.translatesAutoresizingMaskIntoConstraints = false
 
-        previewLabel.stringValue = item.preview
+        previewLabel.stringValue = displayPreview
         previewLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         previewLabel.textColor = .labelColor
         previewLabel.lineBreakMode = .byTruncatingTail
@@ -207,6 +250,10 @@ final class CardView: NSControl {
         return badge
     }
 
+    func showPreview() {
+        showPreviewPopover()
+    }
+
     private func showPreviewPopover() {
         guard item.kind != .password else { return }
         guard previewPopover == nil || previewPopover?.isShown == false else { return }
@@ -227,7 +274,9 @@ final class CardView: NSControl {
         imageView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.08).cgColor
         imageView.translatesAutoresizingMaskIntoConstraints = false
 
-        let caption = NSTextField(labelWithString: item.preview)
+        let dimensions = "\(Int(image.size.width)) x \(Int(image.size.height)) px"
+        let size = ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
+        let caption = NSTextField(labelWithString: "\(item.preview) · \(dimensions) · \(size)")
         caption.font = .systemFont(ofSize: 12, weight: .semibold)
         caption.textColor = .secondaryLabelColor
         caption.alignment = .center
@@ -355,6 +404,13 @@ final class CardView: NSControl {
         default:
             return "\(header)\n\(item.content)"
         }
+    }
+
+    private var displayPreview: String {
+        if item.kind == .password, AppSettings.shared.shouldMaskSensitiveContent {
+            return item.preview
+        }
+        return item.preview
     }
 
     private func firstWords(maximum: Int) -> String {

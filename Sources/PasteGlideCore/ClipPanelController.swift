@@ -14,6 +14,37 @@ final class KeyHandlingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     override func keyDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.command) {
+            switch event.charactersIgnoringModifiers?.lowercased() {
+            case "f":
+                keyController?.focusSearch()
+                return
+            case "1":
+                keyController?.selectFilterSegment(0)
+                return
+            case "2":
+                keyController?.selectFilterSegment(1)
+                return
+            case "3":
+                keyController?.selectFilterSegment(2)
+                return
+            case "4":
+                keyController?.selectFilterSegment(3)
+                return
+            case "5":
+                keyController?.selectFilterSegment(4)
+                return
+            case "6":
+                keyController?.selectFilterSegment(5)
+                return
+            case "7":
+                keyController?.selectFilterSegment(6)
+                return
+            default:
+                break
+            }
+        }
+
         switch event.keyCode {
         case UInt16(kVK_LeftArrow):
             keyController?.selectPrevious()
@@ -27,6 +58,8 @@ final class KeyHandlingPanel: NSPanel {
             keyController?.copySelectedItem()
         case UInt16(kVK_Delete), UInt16(kVK_ForwardDelete):
             keyController?.deleteSelectedItem()
+        case UInt16(kVK_Space):
+            keyController?.previewSelectedItem()
         case UInt16(kVK_Escape):
             orderOut(nil)
         default:
@@ -43,6 +76,7 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
     private let scrollView = NSScrollView()
     private let stackView = NSStackView()
     private let searchField = NSSearchField()
+    private let filterControl = NSSegmentedControl(labels: ["Tous", "★", "YT", "Texte", "MDP", "#", "Img"], trackingMode: .selectOne, target: nil, action: nil)
     private let statsLabel = NSTextField(labelWithString: "")
     private let lastCardLabel = NSTextField(labelWithString: "")
     private let lastCardDateFormatter: DateFormatter = {
@@ -58,6 +92,8 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
     private var horizontalStatsConstraints: [NSLayoutConstraint] = []
     private var verticalStatsConstraints: [NSLayoutConstraint] = []
     private var scrollTopConstraint: NSLayoutConstraint?
+    private var selectedKindFilter: ClipboardKind?
+    private var showsPinnedOnly = false
     private var selectedIndex = 0
 
     init(database: ClipboardDatabase) {
@@ -87,7 +123,7 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
 
     private func makePanel() -> NSPanel {
         let panel = KeyHandlingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 980, height: 214),
+            contentRect: NSRect(x: 0, y: 0, width: 980, height: 242),
             styleMask: [.titled, .utilityWindow, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -119,6 +155,12 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
         searchField.action = #selector(searchChanged(_:))
         searchField.translatesAutoresizingMaskIntoConstraints = false
 
+        filterControl.selectedSegment = 0
+        filterControl.target = self
+        filterControl.action = #selector(filterChanged(_:))
+        filterControl.segmentStyle = .rounded
+        filterControl.translatesAutoresizingMaskIntoConstraints = false
+
         statsLabel.font = .systemFont(ofSize: 12, weight: .medium)
         statsLabel.textColor = .secondaryLabelColor
         statsLabel.lineBreakMode = .byTruncatingTail
@@ -144,6 +186,7 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
 
         scrollView.documentView = stackView
         visualEffect.addSubview(searchField)
+        visualEffect.addSubview(filterControl)
         visualEffect.addSubview(statsLabel)
         visualEffect.addSubview(lastCardLabel)
         visualEffect.addSubview(scrollView)
@@ -154,8 +197,12 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
             searchField.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor, constant: -16),
             searchField.topAnchor.constraint(equalTo: visualEffect.topAnchor, constant: 14),
 
+            filterControl.leadingAnchor.constraint(equalTo: searchField.leadingAnchor),
+            filterControl.trailingAnchor.constraint(lessThanOrEqualTo: searchField.trailingAnchor),
+            filterControl.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 6),
+
             statsLabel.leadingAnchor.constraint(equalTo: searchField.leadingAnchor),
-            statsLabel.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 6),
+            statsLabel.topAnchor.constraint(equalTo: filterControl.bottomAnchor, constant: 6),
 
             scrollView.leadingAnchor.constraint(equalTo: visualEffect.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: visualEffect.trailingAnchor),
@@ -208,6 +255,14 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
                 self?.deleteItem(selectedItem)
             } onTogglePin: { [weak self] selectedItem in
                 self?.togglePin(selectedItem)
+            } onCopyPlainText: { [weak self] selectedItem in
+                self?.copyPlainText(selectedItem)
+            } onOpen: { [weak self] selectedItem in
+                self?.openItem(selectedItem)
+            } onSaveImage: { [weak self] selectedItem in
+                self?.saveImage(selectedItem)
+            } onDeleteKind: { [weak self] selectedItem in
+                self?.deleteKind(selectedItem.kind)
             }
             cardViews.append(card)
             stackView.addArrangedSubview(card)
@@ -218,10 +273,17 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
 
     private func filteredItems() -> [ClipboardItem] {
         let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return allItems }
-
         return allItems.filter { item in
-            item.searchHaystack.contains(query)
+            if showsPinnedOnly, !item.isPinned {
+                return false
+            }
+            if let selectedKindFilter, item.kind != selectedKindFilter {
+                return false
+            }
+            guard !query.isEmpty else {
+                return true
+            }
+            return item.searchHaystack.contains(query)
         }
     }
 
@@ -302,7 +364,7 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
         } else {
             let widthPercent = CGFloat(AppSettings.shared.panelWidthPercent) / 100
             width = min(max(visible.width * widthPercent, 680), 1280)
-            height = 214
+            height = 242
             x = visible.midX - width / 2
             y = position == .top ? visible.maxY - height - margin : visible.minY + margin
         }
@@ -318,6 +380,31 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
             pasteboard.setString(item.content, forType: .string)
         }
         panel.orderOut(nil)
+    }
+
+    private func copyPlainText(_ item: ClipboardItem) {
+        pasteboard.clearContents()
+        pasteboard.setString(item.kind == .image ? item.preview : item.content, forType: .string)
+    }
+
+    private func openItem(_ item: ClipboardItem) {
+        guard item.kind != .image, let url = URL(string: item.content), url.scheme != nil else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func saveImage(_ item: ClipboardItem) {
+        guard item.kind == .image, let data = Data(base64Encoded: item.content) else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "PasteGlide-image.png"
+        panel.allowedContentTypes = [.png]
+        if panel.runModal() == .OK, let url = panel.url {
+            try? data.write(to: url)
+        }
+    }
+
+    private func deleteKind(_ kind: ClipboardKind) {
+        try? database.delete(kind: kind)
+        reload()
     }
 
     func selectPrevious() {
@@ -342,6 +429,21 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
         deleteItem(visibleItems[selectedIndex])
     }
 
+    func previewSelectedItem() {
+        guard cardViews.indices.contains(selectedIndex) else { return }
+        cardViews[selectedIndex].showPreview()
+    }
+
+    func focusSearch() {
+        panel.makeFirstResponder(searchField)
+    }
+
+    func selectFilterSegment(_ segment: Int) {
+        guard segment >= 0, segment < filterControl.segmentCount else { return }
+        filterControl.selectedSegment = segment
+        applyFilter(segment: segment)
+    }
+
     private func updateSelection() {
         for (index, card) in cardViews.enumerated() {
             card.isSelectedCard = index == selectedIndex
@@ -359,6 +461,24 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
     }
 
     @objc private func searchChanged(_ sender: NSSearchField) {
+        render(items: filteredItems())
+    }
+
+    @objc private func filterChanged(_ sender: NSSegmentedControl) {
+        applyFilter(segment: sender.selectedSegment)
+    }
+
+    private func applyFilter(segment: Int) {
+        showsPinnedOnly = segment == 1
+        selectedKindFilter = switch segment {
+        case 2: .youtube
+        case 3: .text
+        case 4: .password
+        case 5: .number
+        case 6: .image
+        default: nil
+        }
+        selectedIndex = 0
         render(items: filteredItems())
     }
 

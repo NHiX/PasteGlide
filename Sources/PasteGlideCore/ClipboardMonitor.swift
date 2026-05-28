@@ -38,6 +38,7 @@ final class ClipboardMonitor {
     private func scanPasteboard() {
         guard pasteboard.changeCount != lastChangeCount else { return }
         lastChangeCount = pasteboard.changeCount
+        guard !AppSettings.shared.isCapturePaused else { return }
         guard !AppSettings.shared.isExcluded(application: NSWorkspace.shared.frontmostApplication) else { return }
 
         if let image = NSImage(pasteboard: pasteboard), let base64 = image.pngBase64() {
@@ -56,6 +57,7 @@ final class ClipboardMonitor {
         guard !trimmed.isEmpty else { return }
 
         let kind = classifier.classifyString(trimmed)
+        guard kind != .password || AppSettings.shared.shouldCapturePasswords else { return }
         let preview = classifier.preview(for: trimmed, kind: kind)
         let hash = Self.hash("\(kind.rawValue):\(trimmed)")
         try? database.insert(kind: kind, content: trimmed, preview: preview, hash: hash)

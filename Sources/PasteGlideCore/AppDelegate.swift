@@ -69,6 +69,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(menuItem(title: "Afficher l'historique", action: #selector(togglePanel), keyEquivalent: ""))
         menu.addItem(menuItem(title: "Préférences", action: #selector(showPreferences), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(menuItem(title: "Pause capture 5 min", action: #selector(pauseCaptureFiveMinutes), keyEquivalent: ""))
+        menu.addItem(menuItem(title: "Pause capture 15 min", action: #selector(pauseCaptureFifteenMinutes), keyEquivalent: ""))
+        menu.addItem(menuItem(title: "Pause capture 30 min", action: #selector(pauseCaptureThirtyMinutes), keyEquivalent: ""))
+        menu.addItem(menuItem(title: "Reprendre la capture", action: #selector(resumeCapture), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(menuItem(title: "Exporter l'historique", action: #selector(exportHistory), keyEquivalent: ""))
         menu.addItem(menuItem(title: "Importer un historique", action: #selector(importHistory), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
@@ -130,9 +135,44 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.hotKeyController?.register()
             self?.panelController?.reloadIfVisible()
         }
+        controller.onDeleteAll = { [weak self] in
+            try? self?.database?.deleteAll()
+            self?.panelController?.reloadIfVisible()
+        }
+        controller.onDeleteImages = { [weak self] in
+            try? self?.database?.delete(kind: .image)
+            self?.panelController?.reloadIfVisible()
+        }
+        controller.onDeleteOldItems = { [weak self] in
+            let days = AppSettings.shared.retentionDays
+            if days > 0 {
+                try? self?.database?.deleteOlderThan(days: days)
+                self?.panelController?.reloadIfVisible()
+            }
+        }
         preferencesWindowController = controller
         controller.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func pauseCaptureFiveMinutes() {
+        pauseCapture(minutes: 5)
+    }
+
+    @objc private func pauseCaptureFifteenMinutes() {
+        pauseCapture(minutes: 15)
+    }
+
+    @objc private func pauseCaptureThirtyMinutes() {
+        pauseCapture(minutes: 30)
+    }
+
+    @objc private func resumeCapture() {
+        AppSettings.shared.capturePauseUntil = nil
+    }
+
+    private func pauseCapture(minutes: Int) {
+        AppSettings.shared.capturePauseUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
     }
 
     @objc private func exportHistory() {

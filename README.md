@@ -1,25 +1,16 @@
 # PasteGlide
 
-PasteGlide est un gestionnaire de presse-papier macOS natif écrit en Swift/AppKit. Il surveille le presse-papier, conserve un historique local dans SQLite, puis affiche les éléments copiés sous forme de cartes horizontales juste au-dessus du Dock.
+PasteGlide est un gestionnaire de presse-papier macOS natif écrit en Swift/AppKit. Il conserve un historique local SQLite, classe les contenus copiés, affiche des cartes rapides et peut se placer en bas, en haut, sur les côtés ou au milieu de l'écran.
 
-## Raccourci clavier
-
-La combinaison de touche pour appeler PasteGlide est:
-
-```text
-Option + Commande + V
-⌥⌘V
-```
-
-Ce raccourci affiche ou masque le panneau d'historique.
+English documentation: [README.en.md](README.en.md)
 
 ## Prérequis
 
 - macOS 14 ou plus récent
 - Swift 6 ou plus récent
 - Xcode Command Line Tools
-- SQLite système, lié via `libsqlite3`
-- Vision.framework système pour l'OCR des images
+- SQLite système via `libsqlite3`
+- Vision.framework pour l'OCR local des images
 
 ## Lancement
 
@@ -29,113 +20,7 @@ Depuis le dossier du projet:
 swift run
 ```
 
-PasteGlide démarre en mode accessoire:
-
-- aucune fenêtre principale n'est ouverte au lancement
-- une entrée `PasteGlide` apparaît dans la barre de menus
-- le raccourci `⌥⌘V` ouvre ou ferme l'historique
-
-## Utilisation
-
-1. Lance PasteGlide avec `swift run`.
-2. Copie du texte, un lien YouTube, une suite de chiffres, un mot de passe ou une image.
-3. Appuie sur `⌥⌘V` pour afficher l'historique.
-4. Utilise le champ de recherche pour filtrer les cartes par type, aperçu ou contenu.
-5. Clique sur une carte pour remettre son contenu dans le presse-papier.
-6. Pour une carte de mot de passe, fais un clic droit sur la carte pour révéler ou masquer le contenu localement.
-
-Le panneau se ferme automatiquement après la sélection d'une carte.
-
-Sur les cartes de texte, le badge de gauche affiche le nombre de caractères et les premiers mots quand ils tiennent dans l'espace disponible. Survole une carte pour afficher le contenu complet dans une bulle flottante lisible.
-
-Le clavier permet aussi de piloter l'historique:
-
-- Flèche gauche/droite: sélectionner la carte précédente ou suivante
-- Entrée: copier la carte sélectionnée
-- Suppr: supprimer la carte sélectionnée
-- Échap: fermer le panneau
-
-Un clic droit sur une carte permet de l'épingler ou de la supprimer. Les cartes épinglées restent en tête et ne sont pas supprimées par la rétention automatique.
-
-## Types de cartes
-
-PasteGlide classe automatiquement les contenus copiés:
-
-- Rouge: lien YouTube
-- Jaune: texte standard
-- Violet: mot de passe probable, masqué par défaut
-- Bleu: suite de chiffres
-- Vert: image
-
-Les cartes image affichent un aperçu miniature généré depuis l'image PNG stockée en base64. Au survol, PasteGlide ouvre aussi un aperçu agrandi dans une bulle flottante.
-
-PasteGlide lance aussi un OCR local sur les images avec Vision.framework d'Apple. Aucun binaire Tesseract, installation Homebrew ou dépendance externe n'est nécessaire. Le texte reconnu apparaît dans la bulle de prévisualisation et peut être retrouvé via la recherche.
-
-Au démarrage, PasteGlide complète automatiquement l'OCR des anciennes images qui étaient déjà présentes dans la base avant l'ajout de cette fonctionnalité.
-
-Les mots de passe sont détectés par heuristique: texte court sans espace, avec une combinaison de lettres, chiffres ou symboles. Cette détection n'est pas parfaite, car macOS ne fournit pas le contexte d'origine du contenu copié.
-
-## Stockage SQLite
-
-La base de données est créée automatiquement ici:
-
-```text
-~/Library/Application Support/PasteGlide/history.sqlite
-```
-
-Elle contient par défaut les 100 derniers éléments copiés. Cette limite, la rétention en jours, l'OCR, la touche du raccourci, la largeur du panneau et les applications exclues se configurent dans le menu `PasteGlide > Préférences`.
-
-Schéma logique:
-
-- `id`: identifiant SQLite
-- `kind`: type de carte
-- `content`: contenu complet
-- `preview`: aperçu affiché dans la carte
-- `ocr_text`: texte reconnu dans les images via OCR
-- `ocr_attempted`: indique qu'une image a déjà été traitée par OCR, même si aucun texte n'a été reconnu
-- `is_pinned`: indique qu'une carte est épinglée
-- `created_at`: date de création
-- `content_hash`: hash utilisé pour éviter les doublons consécutifs
-
-Les images sont converties en PNG puis stockées en base64 dans `content`. Le texte reconnu dans ces images est stocké séparément dans `ocr_text`.
-
-## Interface
-
-Le panneau d'historique est un `NSPanel` flottant:
-
-- positionné au-dessus du Dock
-- centré sur l'écran principal
-- affiché sur tous les espaces macOS
-- équipé d'un champ de recherche en haut
-- composé d'un défilement horizontal de cartes
-
-Chaque carte possède un contour coloré selon son type, une zone de contenu plus large, et un badge ou une miniature à gauche. Les cartes texte affichent un compteur de caractères dans le badge et un aperçu complet au survol; les cartes image affichent une miniature et un aperçu agrandi au survol.
-
-Le menu de barre système permet aussi d'exporter ou d'importer une base SQLite d'historique.
-
-## Architecture
-
-Le code est séparé en trois cibles SwiftPM:
-
-- `PasteGlideCore`: logique applicative, SQLite, OCR, UI AppKit et préférences
-- `PasteGlide`: lanceur macOS minimal qui démarre `AppDelegate`
-- `PasteGlideCoreTests`: tests exécutables sans dépendance à XCTest, adaptés à la toolchain locale
-
-## Commandes utiles
-
-Compiler:
-
-```bash
-swift build
-```
-
-Lancer les tests cœur:
-
-```bash
-swift run PasteGlideCoreTests
-```
-
-Créer une application macOS datée dans `dist/`:
+Créer une app macOS dans `dist/`:
 
 ```bash
 ./scripts/build_app.sh
@@ -147,28 +32,138 @@ Le bundle généré suit ce format:
 dist/PasteGlide_YYYY-MM-DD_HH-MM.app
 ```
 
-Lancer:
+## Raccourcis
 
-```bash
-swift run
+Le raccourci global par défaut est `⌥⌘V`. Il affiche ou masque le panneau d'historique.
+
+Dans le panneau:
+
+- `←` / `→` / `↑` / `↓`: sélectionner une carte
+- `Entrée`: copier la carte sélectionnée
+- `Espace`: afficher la prévisualisation
+- `Suppr`: supprimer la carte sélectionnée
+- `⌘F`: placer le curseur dans la recherche
+- `⌘1` à `⌘7`: changer de filtre
+- `Échap`: fermer le panneau
+
+## Utilisation
+
+1. Lance PasteGlide.
+2. Copie du texte, une URL, un lien YouTube, une suite de chiffres, un mot de passe probable ou une image.
+3. Appuie sur `⌥⌘V`.
+4. Recherche, filtre ou navigue au clavier.
+5. Clique sur une carte ou appuie sur `Entrée` pour remettre son contenu dans le presse-papier.
+
+Un clic droit sur une carte donne accès aux actions rapides:
+
+- copier en texte brut;
+- ouvrir un lien;
+- enregistrer une image;
+- révéler ou masquer un mot de passe;
+- épingler ou désépingler;
+- supprimer la carte;
+- supprimer toutes les cartes du même type.
+
+## Filtres et statistiques
+
+Sous la recherche, PasteGlide affiche:
+
+- le nombre total d'objets mémorisés;
+- le nombre d'images, textes, chiffres, mots de passe et liens YouTube;
+- la date et l'heure de la dernière carte.
+
+Les filtres rapides permettent d'afficher:
+
+- tous les éléments;
+- uniquement les éléments épinglés;
+- YouTube;
+- texte;
+- mots de passe;
+- chiffres;
+- images.
+
+## Positions du panneau
+
+Dans les préférences, le panneau peut être affiché:
+
+- en bas, au-dessus du Dock;
+- en haut;
+- à gauche;
+- à droite;
+- au milieu de l'écran.
+
+Les positions `Gauche`, `Droite` et `Milieu` utilisent une colonne avec défilement vertical. Les positions `Bas` et `Haut` utilisent une rangée avec défilement horizontal.
+
+## Confidentialité
+
+PasteGlide peut:
+
+- ne pas mémoriser les mots de passe probables;
+- masquer les contenus sensibles dans les cartes;
+- exclure des applications par nom ou bundle id;
+- mettre la capture en pause pendant 5, 15 ou 30 minutes depuis le menu de barre macOS.
+
+La détection des mots de passe est heuristique: macOS ne fournit pas le contexte d'origine du contenu copié.
+
+## Images et OCR
+
+Les images sont converties en PNG, stockées en base64 dans SQLite, puis affichées sous forme de miniature.
+
+Si l'OCR est activé, PasteGlide utilise Vision.framework localement. Le texte reconnu est indexé par la recherche et affiché dans la prévisualisation.
+
+## Nettoyage
+
+Les préférences permettent de:
+
+- définir le nombre d'éléments à conserver;
+- définir une rétention en jours;
+- supprimer les images;
+- supprimer les éléments plus vieux que la rétention configurée;
+- vider tout l'historique.
+
+Les éléments épinglés sont conservés par la rétention automatique.
+
+## Stockage
+
+La base locale est créée ici:
+
+```text
+~/Library/Application Support/PasteGlide/history.sqlite
 ```
 
-Vérifier l'état Git:
+Schéma logique:
+
+- `id`: identifiant SQLite
+- `kind`: type de carte
+- `content`: contenu complet
+- `preview`: aperçu affiché
+- `ocr_text`: texte reconnu dans les images
+- `ocr_attempted`: statut de traitement OCR
+- `is_pinned`: carte épinglée
+- `created_at`: date de création
+- `content_hash`: hash anti-doublon consécutif
+
+## Import et export
+
+Le menu de barre macOS permet:
+
+- d'exporter l'historique SQLite;
+- d'importer un historique existant.
+
+## Tests
 
 ```bash
-git status --short
+swift run PasteGlideCoreTests
 ```
 
 ## Dépannage
 
-Si le raccourci `⌥⌘V` ne répond pas, vérifie qu'aucune autre application n'utilise déjà cette combinaison.
+Si `⌥⌘V` ne répond pas, vérifie qu'aucune autre app n'utilise déjà ce raccourci.
 
-Si l'historique semble vide, copie un nouvel élément après le lancement de PasteGlide: l'application surveille les changements du presse-papier pendant qu'elle est active.
+Si l'historique semble vide, copie un nouvel élément après le lancement: PasteGlide surveille le presse-papier uniquement pendant qu'il est actif.
 
-Si tu veux repartir d'un historique vide, quitte PasteGlide puis supprime la base:
+Pour repartir d'un historique vide:
 
 ```bash
 rm ~/Library/Application\ Support/PasteGlide/history.sqlite
 ```
-
-La base sera recréée au prochain lancement.

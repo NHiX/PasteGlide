@@ -61,6 +61,29 @@ public final class AppSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: "isOCREnabled") }
     }
 
+    public var shouldCapturePasswords: Bool {
+        get { defaults.object(forKey: "shouldCapturePasswords") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "shouldCapturePasswords") }
+    }
+
+    public var shouldMaskSensitiveContent: Bool {
+        get { defaults.object(forKey: "shouldMaskSensitiveContent") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "shouldMaskSensitiveContent") }
+    }
+
+    public var capturePauseUntil: Date? {
+        get {
+            let timestamp = defaults.double(forKey: "capturePauseUntil")
+            guard timestamp > Date().timeIntervalSince1970 else { return nil }
+            return Date(timeIntervalSince1970: timestamp)
+        }
+        set { defaults.set(newValue?.timeIntervalSince1970 ?? 0, forKey: "capturePauseUntil") }
+    }
+
+    public var isCapturePaused: Bool {
+        capturePauseUntil != nil
+    }
+
     public var excludedApplications: [String] {
         get { defaults.stringArray(forKey: "excludedApplications") ?? [] }
         set { defaults.set(newValue.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }, forKey: "excludedApplications") }
