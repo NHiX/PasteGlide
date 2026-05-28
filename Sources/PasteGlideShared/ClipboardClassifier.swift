@@ -1,11 +1,4 @@
-import AppKit
-import Carbon
-import CryptoKit
 import Foundation
-import ImageIO
-import SQLite3
-import UniformTypeIdentifiers
-import Vision
 
 public final class ClipboardClassifier {
     public init() {}

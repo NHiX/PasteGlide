@@ -1,5 +1,6 @@
 import Foundation
 import PasteGlideCore
+import PasteGlideShared
 
 enum TestFailure: Error {
     case failed(String)

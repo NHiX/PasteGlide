@@ -8,7 +8,11 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "PasteGlideShared"
+        ),
+        .target(
             name: "PasteGlideCore",
+            dependencies: ["PasteGlideShared"],
             linkerSettings: [
                 .linkedFramework("Vision"),
                 .linkedLibrary("sqlite3")
@@ -19,8 +23,12 @@ let package = Package(
             dependencies: ["PasteGlideCore"]
         ),
         .executableTarget(
+            name: "PasteGlideSharedTests",
+            dependencies: ["PasteGlideShared"]
+        ),
+        .executableTarget(
             name: "PasteGlideCoreTests",
-            dependencies: ["PasteGlideCore"]
+            dependencies: ["PasteGlideCore", "PasteGlideShared"]
         )
     ]
 )

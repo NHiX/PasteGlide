@@ -3,6 +3,7 @@ import Carbon
 import CryptoKit
 import Foundation
 import ImageIO
+import PasteGlideShared
 import SQLite3
 import UniformTypeIdentifiers
 import Vision

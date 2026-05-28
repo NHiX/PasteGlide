@@ -1,11 +1,4 @@
-import AppKit
-import Carbon
-import CryptoKit
 import Foundation
-import ImageIO
-import SQLite3
-import UniformTypeIdentifiers
-import Vision
 
 public enum ClipboardKind: String, CaseIterable {
     case youtube
@@ -23,17 +16,6 @@ public enum ClipboardKind: String, CaseIterable {
         case .password: "Mot de passe"
         case .number: "Chiffres"
         case .image: "Image"
-        }
-    }
-
-    public var borderColor: NSColor {
-        switch self {
-        case .youtube: .systemRed
-        case .url: .systemTeal
-        case .text: .systemYellow
-        case .password: .systemPurple
-        case .number: .systemBlue
-        case .image: .systemGreen
         }
     }
 }
