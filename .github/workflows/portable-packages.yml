@@ -79,8 +79,14 @@ jobs:
           swift --version
           swift build -c release --product PasteGlidePortable
           New-Item -ItemType Directory -Force -Path dist/windows/PasteGlide | Out-Null
-          $portableExe = Get-ChildItem .build -Recurse -Filter PasteGlidePortable.exe | Select-Object -First 1
+          $portableExe = Get-ChildItem .build -Recurse -File |
+            Where-Object { $_.Name -eq "PasteGlidePortable.exe" -or $_.Name -eq "PasteGlidePortable" } |
+            Sort-Object FullName |
+            Select-Object -First 1
           if (-not $portableExe) {
+            Get-ChildItem .build -Recurse -File |
+              Where-Object { $_.Name -like "*PasteGlidePortable*" } |
+              Select-Object -ExpandProperty FullName
             throw "PasteGlidePortable.exe was not found after build."
           }
           Copy-Item $portableExe.FullName dist/windows/PasteGlide/PasteGlide.exe
