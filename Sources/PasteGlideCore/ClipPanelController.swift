@@ -99,6 +99,7 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
     private var selectedKindFilter: ClipboardKind?
     private var showsPinnedOnly = false
     private var selectedIndex = 0
+    private let search = ClipboardSearch()
 
     init(database: ClipboardDatabase) {
         self.database = database
@@ -280,66 +281,12 @@ final class ClipPanelController: NSObject, NSSearchFieldDelegate {
     }
 
     private func filteredItems() -> [ClipboardItem] {
-        let rawQuery = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let search = parsedSearch(rawQuery)
-        return allItems.filter { item in
-            if showsPinnedOnly, !item.isPinned {
-                return false
-            }
-            if let selectedKindFilter, item.kind != selectedKindFilter {
-                return false
-            }
-            if let kind = search.kind, item.kind != kind {
-                return false
-            }
-            if let pinned = search.pinned, item.isPinned != pinned {
-                return false
-            }
-            if let cutoff = search.createdAfter, item.createdAt < cutoff {
-                return false
-            }
-            guard !search.text.isEmpty else {
-                return true
-            }
-            return item.searchHaystack.contains(search.text)
-        }
-    }
-
-    private func parsedSearch(_ query: String) -> (text: String, kind: ClipboardKind?, pinned: Bool?, createdAfter: Date?) {
-        var terms: [String] = []
-        var kind: ClipboardKind?
-        var pinned: Bool?
-        var createdAfter: Date?
-
-        for token in query.split(separator: " ") {
-            if token.hasPrefix("type:") {
-                let value = token.dropFirst("type:".count)
-                kind = ClipboardKind.allCases.first { $0.rawValue == value || $0.title.lowercased() == value }
-            } else if token.hasPrefix("pinned:") {
-                let value = token.dropFirst("pinned:".count)
-                pinned = value == "true" || value == "yes" || value == "1"
-            } else if token.hasPrefix("after:") {
-                let value = String(token.dropFirst("after:".count))
-                createdAfter = relativeCutoff(from: value)
-            } else {
-                terms.append(String(token))
-            }
-        }
-
-        return (terms.joined(separator: " "), kind, pinned, createdAfter)
-    }
-
-    private func relativeCutoff(from value: String) -> Date? {
-        guard value.count >= 2, let amount = Int(value.dropLast()) else { return nil }
-        let unit = value.suffix(1)
-        let seconds: TimeInterval
-        switch unit {
-        case "h": seconds = TimeInterval(amount * 60 * 60)
-        case "d": seconds = TimeInterval(amount * 24 * 60 * 60)
-        case "w": seconds = TimeInterval(amount * 7 * 24 * 60 * 60)
-        default: return nil
-        }
-        return Date().addingTimeInterval(-seconds)
+        search.filter(
+            allItems,
+            rawQuery: searchField.stringValue,
+            showsPinnedOnly: showsPinnedOnly,
+            selectedKindFilter: selectedKindFilter
+        )
     }
 
     private func updateStats() {

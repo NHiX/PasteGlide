@@ -6,7 +6,7 @@ PasteGlide est aujourd'hui une application macOS native. Le code utilise AppKit,
 
 Le travail ajoute ici prepare le packaging sans masquer cette contrainte:
 
-- `PasteGlideShared` contient maintenant les modeles et la classification sans AppKit, ce qui donne une premiere base compilable pour les ports.
+- `PasteGlideShared` contient maintenant les modeles, la classification et la recherche/filtrage sans AppKit, ce qui donne une premiere base compilable pour les ports.
 - `scripts/build_linux_packages.sh` package un binaire Linux existant en `.deb` et `.rpm` via `nfpm`.
 - `scripts/build_windows_packages.ps1` package un dossier Windows existant en `.zip` et, si WiX est installe, en `.msi`.
 - `packaging/linux/pasteglide.desktop` fournit l'integration bureau Linux.
@@ -40,7 +40,7 @@ PasteGlide is currently a native macOS app. The code uses AppKit, Carbon, Vision
 
 The work added here prepares packaging without hiding that constraint:
 
-- `PasteGlideShared` now contains the models and classification without AppKit, providing a first compilable base for the ports.
+- `PasteGlideShared` now contains the models, classification, and search/filtering without AppKit, providing a first compilable base for the ports.
 - `scripts/build_linux_packages.sh` packages an existing Linux binary into `.deb` and `.rpm` with `nfpm`.
 - `scripts/build_windows_packages.ps1` packages an existing Windows app folder into `.zip` and, when WiX is installed, `.msi`.
 - `packaging/linux/pasteglide.desktop` provides Linux desktop integration.
