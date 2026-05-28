@@ -89,11 +89,47 @@ func testPanelPositionSharedLayoutMetadata() throws {
     try expect(PanelPosition.center.isVertical == true, "center layout should be vertical")
 }
 
+func testSettingsRulesNormalizePortablePreferences() throws {
+    try expect(PasteGlideSettingsRules.normalizedHistoryLimit(0) == 100, "missing history limit should use default")
+    try expect(PasteGlideSettingsRules.normalizedHistoryLimit(3) == 10, "history limit should be clamped to minimum")
+    try expect(PasteGlideSettingsRules.normalizedRetentionDays(-4) == 0, "retention days should not be negative")
+    try expect(PasteGlideSettingsRules.normalizedMaxCapturedImageMegabytes(0) == 20, "missing image limit should use default")
+    try expect(PasteGlideSettingsRules.normalizedMaxCapturedImageMegabytes(500) == 200, "image limit should be capped")
+    try expect(PasteGlideSettingsRules.normalizedPanelWidthPercent(0) == 86, "missing panel width should use default")
+    try expect(PasteGlideSettingsRules.normalizedPanelWidthPercent(12) == 50, "panel width should be clamped to minimum")
+    try expect(PasteGlideSettingsRules.normalizedPanelWidthPercent(120) == 95, "panel width should be capped")
+    try expect(PasteGlideSettingsRules.normalizedHotKeyCharacter(" m ") == "M", "hotkey should normalize to first uppercase character")
+    try expect(PasteGlideSettingsRules.normalizedHotKeyCharacter("") == "V", "empty hotkey should use default")
+}
+
+func testSettingsRulesMatchExcludedApplications() throws {
+    let exclusions = PasteGlideSettingsRules.normalizedExcludedApplications(["  safari  ", "", "com.secret"])
+    try expect(exclusions == ["safari", "com.secret"], "excluded apps should be trimmed and empty values removed")
+    try expect(
+        PasteGlideSettingsRules.isApplicationExcluded(
+            bundleIdentifier: "com.apple.Safari",
+            localizedName: "Safari",
+            exclusions: exclusions
+        ),
+        "bundle/name should match excluded app fragments case-insensitively"
+    )
+    try expect(
+        !PasteGlideSettingsRules.isApplicationExcluded(
+            bundleIdentifier: "com.apple.TextEdit",
+            localizedName: "TextEdit",
+            exclusions: exclusions
+        ),
+        "unlisted apps should not be excluded"
+    )
+}
+
 let tests: [(String, () throws -> Void)] = [
     ("sharedClassifierDetectsExpectedKinds", testClassifierDetectsExpectedKinds),
     ("sharedSearchHaystackUsesOCRButSkipsImageBase64", testSearchHaystackUsesOCRButSkipsImageBase64),
     ("sharedSearchParsesOperatorsAndFiltersItems", testSearchParsesOperatorsAndFiltersItems),
-    ("sharedPanelPositionSharedLayoutMetadata", testPanelPositionSharedLayoutMetadata)
+    ("sharedPanelPositionSharedLayoutMetadata", testPanelPositionSharedLayoutMetadata),
+    ("sharedSettingsRulesNormalizePortablePreferences", testSettingsRulesNormalizePortablePreferences),
+    ("sharedSettingsRulesMatchExcludedApplications", testSettingsRulesMatchExcludedApplications)
 ]
 
 for (name, test) in tests {

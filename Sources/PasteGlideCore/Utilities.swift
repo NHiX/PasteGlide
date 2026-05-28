@@ -17,13 +17,13 @@ public final class AppSettings: @unchecked Sendable {
     private let defaults = UserDefaults.standard
 
     public var historyLimit: Int {
-        get { max(10, defaults.integer(forKey: "historyLimit") == 0 ? 100 : defaults.integer(forKey: "historyLimit")) }
-        set { defaults.set(max(10, newValue), forKey: "historyLimit") }
+        get { PasteGlideSettingsRules.normalizedHistoryLimit(defaults.integer(forKey: "historyLimit")) }
+        set { defaults.set(PasteGlideSettingsRules.normalizedHistoryLimit(newValue), forKey: "historyLimit") }
     }
 
     public var retentionDays: Int {
         get { defaults.integer(forKey: "retentionDays") }
-        set { defaults.set(max(0, newValue), forKey: "retentionDays") }
+        set { defaults.set(PasteGlideSettingsRules.normalizedRetentionDays(newValue), forKey: "retentionDays") }
     }
 
     public var isOCREnabled: Bool {
@@ -42,8 +42,8 @@ public final class AppSettings: @unchecked Sendable {
     }
 
     public var maxCapturedImageMegabytes: Int {
-        get { defaults.integer(forKey: "maxCapturedImageMegabytes") == 0 ? 20 : defaults.integer(forKey: "maxCapturedImageMegabytes") }
-        set { defaults.set(min(max(newValue, 1), 200), forKey: "maxCapturedImageMegabytes") }
+        get { PasteGlideSettingsRules.normalizedMaxCapturedImageMegabytes(defaults.integer(forKey: "maxCapturedImageMegabytes")) }
+        set { defaults.set(PasteGlideSettingsRules.normalizedMaxCapturedImageMegabytes(newValue), forKey: "maxCapturedImageMegabytes") }
     }
 
     public var shouldMaskSensitiveContent: Bool {
@@ -66,17 +66,17 @@ public final class AppSettings: @unchecked Sendable {
 
     public var excludedApplications: [String] {
         get { defaults.stringArray(forKey: "excludedApplications") ?? [] }
-        set { defaults.set(newValue.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }, forKey: "excludedApplications") }
+        set { defaults.set(PasteGlideSettingsRules.normalizedExcludedApplications(newValue), forKey: "excludedApplications") }
     }
 
     public var hotKeyCharacter: String {
-        get { defaults.string(forKey: "hotKeyCharacter") ?? "V" }
-        set { defaults.set(String(newValue.uppercased().prefix(1)), forKey: "hotKeyCharacter") }
+        get { defaults.string(forKey: "hotKeyCharacter") ?? PasteGlideSettingsRules.defaultHotKeyCharacter }
+        set { defaults.set(PasteGlideSettingsRules.normalizedHotKeyCharacter(newValue), forKey: "hotKeyCharacter") }
     }
 
     public var panelWidthPercent: Int {
-        get { defaults.integer(forKey: "panelWidthPercent") == 0 ? 86 : defaults.integer(forKey: "panelWidthPercent") }
-        set { defaults.set(min(max(newValue, 50), 95), forKey: "panelWidthPercent") }
+        get { PasteGlideSettingsRules.normalizedPanelWidthPercent(defaults.integer(forKey: "panelWidthPercent")) }
+        set { defaults.set(PasteGlideSettingsRules.normalizedPanelWidthPercent(newValue), forKey: "panelWidthPercent") }
     }
 
     public var panelPosition: PanelPosition {
@@ -89,10 +89,11 @@ public final class AppSettings: @unchecked Sendable {
 
     func isExcluded(application: NSRunningApplication?) -> Bool {
         guard let application else { return false }
-        let candidates = [application.bundleIdentifier, application.localizedName].compactMap { $0?.lowercased() }
-        return excludedApplications.map { $0.lowercased() }.contains { excluded in
-            candidates.contains { $0.contains(excluded) }
-        }
+        return PasteGlideSettingsRules.isApplicationExcluded(
+            bundleIdentifier: application.bundleIdentifier,
+            localizedName: application.localizedName,
+            exclusions: excludedApplications
+        )
     }
 
     var hotKeyCode: UInt32 {
