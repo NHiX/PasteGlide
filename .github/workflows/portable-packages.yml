@@ -77,15 +77,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          function Invoke-NativeCommand {
-            param([Parameter(ValueFromRemainingArguments = $true)][string[]] $Command)
-            & $Command[0] @($Command | Select-Object -Skip 1)
-            if ($LASTEXITCODE -ne 0) {
-              throw "$($Command -join ' ') failed with exit code $LASTEXITCODE"
-            }
-          }
           swift --version
-          Invoke-NativeCommand swift build -c release --product PasteGlidePortable
+          swift build -c release --product PasteGlidePortable
+          if ($LASTEXITCODE -ne 0) {
+            throw "swift build failed with exit code $LASTEXITCODE"
+          }
           $binPath = swift build -c release --product PasteGlidePortable --show-bin-path
           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($binPath)) {
             throw "SwiftPM did not return a release binary path."
