@@ -30,7 +30,13 @@ Build the distribution DMG with the app and an `/Applications` shortcut:
 ./scripts/build_dmg.sh
 ```
 
-The DMG contains `PasteGlide.app` and an `Applications` shortcut for drag-and-drop installation. The app is ad-hoc signed so the macOS bundle stays consistent; without an Apple Developer ID certificate and notarization, macOS may still require right-clicking the app and choosing `Open`.
+Also build the `PasteGlide.app` zip published with releases:
+
+```bash
+./scripts/build_zip.sh
+```
+
+GitHub releases publish `PasteGlide.dmg` and `PasteGlide.app.zip`. The DMG contains `PasteGlide.app` and an `Applications` shortcut for drag-and-drop installation. The app is ad-hoc signed so the macOS bundle stays consistent; without an Apple Developer ID certificate and notarization, macOS may still require right-clicking the app and choosing `Open`.
 
 To produce an Apple-notarized DMG, you need an Apple Developer account, a `Developer ID Application` certificate, and a stored `notarytool` keychain profile. Then run:
 
