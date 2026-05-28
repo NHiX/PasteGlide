@@ -73,7 +73,12 @@ jobs:
           }
           $swiftUsr = Resolve-Path (Join-Path $swift.DirectoryName "..")
           $swiftLib = Join-Path $swiftUsr "lib\swift"
-          $swift.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $swiftRoot = Resolve-Path (Join-Path $swift.DirectoryName "..\..\..")
+          $swiftPaths = @($swift.DirectoryName)
+          $swiftPaths += Get-ChildItem $swiftRoot -Recurse -Filter *.dll -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.DirectoryName } |
+            Sort-Object -Unique
+          $swiftPaths | Sort-Object -Unique | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           "SWIFT_USR=$($swiftUsr.Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "SWIFT_LIB=$swiftLib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
