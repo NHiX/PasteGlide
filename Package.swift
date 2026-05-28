@@ -23,6 +23,10 @@ let package = Package(
             dependencies: ["PasteGlideCore"]
         ),
         .executableTarget(
+            name: "PasteGlidePortable",
+            dependencies: ["PasteGlideShared"]
+        ),
+        .executableTarget(
             name: "PasteGlideSharedTests",
             dependencies: ["PasteGlideShared"]
         ),

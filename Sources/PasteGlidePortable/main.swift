@@ -1,0 +1,113 @@
+import Foundation
+import PasteGlideShared
+
+struct PasteGlidePortableCLI {
+    let arguments: [String]
+    let output: (String) -> Void
+
+    init(arguments: [String] = Array(CommandLine.arguments.dropFirst()), output: @escaping (String) -> Void = { print($0) }) {
+        self.arguments = arguments
+        self.output = output
+    }
+
+    func run() -> Int32 {
+        guard let command = arguments.first else {
+            printUsage()
+            return 0
+        }
+
+        switch command {
+        case "classify":
+            return classify(Array(arguments.dropFirst()))
+        case "search-demo":
+            return searchDemo(Array(arguments.dropFirst()))
+        case "settings-demo":
+            return settingsDemo()
+        case "help", "--help", "-h":
+            printUsage()
+            return 0
+        default:
+            output("Unknown command: \(command)")
+            printUsage()
+            return 2
+        }
+    }
+
+    private func classify(_ values: [String]) -> Int32 {
+        let value = values.joined(separator: " ")
+        guard !value.isEmpty else {
+            output("Missing text to classify.")
+            return 2
+        }
+
+        let classifier = ClipboardClassifier()
+        let kind = classifier.classifyString(value)
+        output("kind=\(kind.rawValue)")
+        output("preview=\(classifier.preview(for: value, kind: kind))")
+        return 0
+    }
+
+    private func searchDemo(_ values: [String]) -> Int32 {
+        let query = values.joined(separator: " ")
+        let now = Date()
+        let items = [
+            ClipboardItem(
+                id: 1,
+                kind: .text,
+                content: "Invoice PasteGlide portable demo",
+                preview: "Invoice PasteGlide portable demo",
+                ocrText: "",
+                isPinned: true,
+                createdAt: now.addingTimeInterval(-60),
+                contentHash: "demo-text"
+            ),
+            ClipboardItem(
+                id: 2,
+                kind: .url,
+                content: "https://example.com",
+                preview: "https://example.com",
+                ocrText: "",
+                isPinned: false,
+                createdAt: now.addingTimeInterval(-120),
+                contentHash: "demo-url"
+            )
+        ]
+
+        let results = ClipboardSearch(now: { now }).filter(
+            items,
+            rawQuery: query,
+            showsPinnedOnly: false,
+            selectedKindFilter: nil
+        )
+        if results.isEmpty {
+            output("No matches")
+        } else {
+            for item in results {
+                output("\(item.id)\t\(item.kind.rawValue)\t\(item.preview)")
+            }
+        }
+        return 0
+    }
+
+    private func settingsDemo() -> Int32 {
+        output("historyLimit=\(PasteGlideSettingsRules.normalizedHistoryLimit(0))")
+        output("panelWidthPercent=\(PasteGlideSettingsRules.normalizedPanelWidthPercent(0))")
+        output("maxCapturedImageMegabytes=\(PasteGlideSettingsRules.normalizedMaxCapturedImageMegabytes(0))")
+        output("hotKeyCharacter=\(PasteGlideSettingsRules.normalizedHotKeyCharacter(""))")
+        return 0
+    }
+
+    private func printUsage() {
+        output("""
+        PasteGlidePortable
+
+        Commands:
+          classify <text>       Classify text with the shared PasteGlide classifier.
+          search-demo <query>   Run the shared search engine against demo items.
+          settings-demo         Print normalized shared default settings.
+          help                  Show this help.
+        """)
+    }
+}
+
+exit(PasteGlidePortableCLI().run())
