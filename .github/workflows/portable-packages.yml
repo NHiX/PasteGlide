@@ -15,6 +15,30 @@ permissions:
   contents: write
 
 jobs:
+  macos:
+    name: macOS .dmg and .app.zip
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build macOS app
+        run: ./scripts/build_app.sh
+
+      - name: Package macOS artifacts
+        run: |
+          APP_DIR="$(find dist -maxdepth 1 -name 'PasteGlide_*.app' -type d -print | sort | tail -n 1)"
+          ./scripts/build_dmg.sh "${APP_DIR}"
+          ./scripts/build_zip.sh "${APP_DIR}"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: pasteglide-macos-packages
+          path: |
+            dist/PasteGlide.dmg
+            dist/PasteGlide.app.zip
+
   linux:
     name: Linux .deb and .rpm
     runs-on: ubuntu-latest
@@ -123,10 +147,17 @@ jobs:
     name: Attach portable packages to release
     if: startsWith(github.ref, 'refs/tags/v')
     needs:
+      - macos
       - linux
       - windows
     runs-on: ubuntu-latest
     steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: pasteglide-macos-packages
+          path: dist/release
+
       - name: Download Linux artifacts
         uses: actions/download-artifact@v5
         with:
@@ -146,12 +177,14 @@ jobs:
         run: |
           cat > release-notes.md <<'NOTES'
           FR
+          - Ajoute les paquets macOS generes automatiquement: .dmg et .app.zip.
           - Ajoute les paquets portables Linux et Windows generes automatiquement.
           - Linux: .deb et .rpm.
           - Windows: .msi et .zip.
           - Ces paquets valident la chaine multiplateforme portable; l'application graphique native Linux/Windows reste a porter.
 
           EN
+          - Adds automatically generated macOS packages: .dmg and .app.zip.
           - Adds automatically generated portable Linux and Windows packages.
           - Linux: .deb and .rpm.
           - Windows: .msi and .zip.
