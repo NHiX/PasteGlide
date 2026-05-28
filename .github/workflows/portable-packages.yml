@@ -71,13 +71,11 @@ jobs:
           if (-not $swift) {
             throw "Swift executable was not found after installation."
           }
-          $swiftRoot = Resolve-Path (Join-Path $swift.DirectoryName "..\..\..")
-          $sdk = Get-ChildItem $swiftRoot -Directory -Recurse -Filter Windows.sdk -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $sdk) {
-            throw "Swift Windows SDK was not found after installation."
-          }
+          $swiftUsr = Resolve-Path (Join-Path $swift.DirectoryName "..")
+          $swiftLib = Join-Path $swiftUsr "lib\swift"
           $swift.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          "SDKROOT=$($sdk.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIFT_USR=$($swiftUsr.Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIFT_LIB=$swiftLib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build portable executable
         shell: pwsh
@@ -90,16 +88,15 @@ jobs:
           )
           $sourceFiles += (Resolve-Path Sources/PasteGlidePortable/main.swift).Path
           swiftc `
-            -sdk $env:SDKROOT `
-            -I "$env:SDKROOT\usr\lib\swift" `
-            -L "$env:SDKROOT\usr\lib\swift\windows" `
+            -I "$env:SWIFT_LIB" `
+            -L "$env:SWIFT_LIB\windows" `
             @sourceFiles `
             -o dist/windows/PasteGlide/PasteGlide.exe
           if ($LASTEXITCODE -ne 0) {
             throw "swiftc failed with exit code $LASTEXITCODE"
           }
-          Copy-Item "$env:SDKROOT\usr\bin\*.dll" dist/windows/PasteGlide -ErrorAction SilentlyContinue
-          Copy-Item "$env:SDKROOT\usr\lib\swift\windows\*.dll" dist/windows/PasteGlide -ErrorAction SilentlyContinue
+          Copy-Item "$env:SWIFT_USR\bin\*.dll" dist/windows/PasteGlide -ErrorAction SilentlyContinue
+          Copy-Item "$env:SWIFT_LIB\windows\*.dll" dist/windows/PasteGlide -ErrorAction SilentlyContinue
 
       - name: Install WiX
         shell: pwsh
