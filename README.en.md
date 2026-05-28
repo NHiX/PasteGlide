@@ -30,6 +30,8 @@ Build the distribution DMG with the app and an `/Applications` shortcut:
 ./scripts/build_dmg.sh
 ```
 
+The DMG contains `PasteGlide.app` and an `Applications` shortcut for drag-and-drop installation. The app is ad-hoc signed so the macOS bundle stays consistent; without an Apple Developer ID certificate and notarization, macOS may still require right-clicking the app and choosing `Open`.
+
 ## Shortcuts
 
 The default global shortcut is `⌥⌘V`.

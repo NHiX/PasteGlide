@@ -21,7 +21,7 @@ fi
 rm -rf "${DMG_STAGING_DIR}" "${DMG_PATH}"
 mkdir -p "${DMG_STAGING_DIR}"
 
-cp -R "${APP_DIR}" "${DMG_STAGING_DIR}/"
+cp -R "${APP_DIR}" "${DMG_STAGING_DIR}/PasteGlide.app"
 ln -s /Applications "${DMG_STAGING_DIR}/Applications"
 
 hdiutil create \

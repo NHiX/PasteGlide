@@ -30,6 +30,8 @@ Créer le DMG de distribution avec l'app et un raccourci vers `/Applications`:
 ./scripts/build_dmg.sh
 ```
 
+Le DMG contient `PasteGlide.app` et un raccourci `Applications` pour installer l'app par glisser-déposer. L'app est signée ad-hoc pour garder un bundle macOS cohérent; sans certificat Apple Developer ID et notarisation, macOS peut encore demander une ouverture via clic droit puis `Ouvrir`.
+
 ## Raccourcis
 
 Le raccourci global par défaut est `⌥⌘V`.

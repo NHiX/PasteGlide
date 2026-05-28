@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_BASE_NAME="PasteGlide"
 STAMP="$(date '+%Y-%m-%d_%H-%M')"
 APP_NAME="${APP_BASE_NAME}_${STAMP}"
+DISPLAY_NAME="${APP_BASE_NAME}"
 DIST_DIR="${ROOT_DIR}/dist"
 APP_DIR="${DIST_DIR}/${APP_NAME}.app"
 CONTENTS_DIR="${APP_DIR}/Contents"
@@ -30,17 +31,17 @@ cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
     <key>CFBundleDevelopmentRegion</key>
     <string>fr</string>
     <key>CFBundleDisplayName</key>
-    <string>${APP_NAME}</string>
+    <string>${DISPLAY_NAME}</string>
     <key>CFBundleExecutable</key>
     <string>${APP_BASE_NAME}</string>
     <key>CFBundleIdentifier</key>
-    <string>local.pasteglide.${STAMP}</string>
+    <string>local.pasteglide</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>${APP_NAME}</string>
+    <string>${DISPLAY_NAME}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -58,5 +59,7 @@ cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
 PLIST
 
 chmod +x "${MACOS_DIR}/${APP_BASE_NAME}"
+
+codesign --force --deep --sign - "${APP_DIR}"
 
 echo "${APP_DIR}"
