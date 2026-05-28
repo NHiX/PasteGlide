@@ -24,6 +24,12 @@ Créer une app macOS dans `dist/`:
 ./scripts/build_app.sh
 ```
 
+Créer le DMG de distribution avec l'app et un raccourci vers `/Applications`:
+
+```bash
+./scripts/build_dmg.sh
+```
+
 ## Raccourcis
 
 Le raccourci global par défaut est `⌥⌘V`.

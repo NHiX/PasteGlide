@@ -24,6 +24,12 @@ Build a macOS app bundle in `dist/`:
 ./scripts/build_app.sh
 ```
 
+Build the distribution DMG with the app and an `/Applications` shortcut:
+
+```bash
+./scripts/build_dmg.sh
+```
+
 ## Shortcuts
 
 The default global shortcut is `⌥⌘V`.
