@@ -1,0 +1,97 @@
+name: Portable Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        required: false
+        default: 0.0.0
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  linux:
+    name: Linux .deb and .rpm
+    runs-on: ubuntu-latest
+    container: swift:6.0-jammy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build portable executable
+        run: |
+          swift --version
+          swift build -c release --product PasteGlidePortable
+          mkdir -p dist/linux
+          cp .build/release/PasteGlidePortable dist/linux/PasteGlide
+          chmod +x dist/linux/PasteGlide
+
+      - name: Install nfpm
+        run: |
+          apt-get update
+          apt-get install -y curl
+          curl -sSfL https://raw.githubusercontent.com/goreleaser/nfpm/main/www/docs/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Package Linux artifacts
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          VERSION="${VERSION:-0.0.0}"
+          VERSION="$VERSION" ./scripts/build_linux_packages.sh dist/linux/PasteGlide
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pasteglide-linux-packages
+          path: |
+            dist/*.deb
+            dist/*.rpm
+
+  windows:
+    name: Windows .msi and .zip
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Swift
+        shell: pwsh
+        run: |
+          winget install --id Swift.Toolchain -e --source winget --accept-package-agreements --accept-source-agreements
+          $swift = Get-ChildItem "C:\Program Files\Swift\Toolchains" -Recurse -Filter swift.exe | Select-Object -First 1
+          if (-not $swift) {
+            throw "Swift executable was not found after installation."
+          }
+          $swift.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build portable executable
+        shell: pwsh
+        run: |
+          swift --version
+          swift build -c release --product PasteGlidePortable
+          New-Item -ItemType Directory -Force -Path dist/windows/PasteGlide | Out-Null
+          Copy-Item .build/release/PasteGlidePortable.exe dist/windows/PasteGlide/PasteGlide.exe
+
+      - name: Install WiX
+        shell: pwsh
+        run: dotnet tool install --global wix
+
+      - name: Package Windows artifacts
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.inputs.version || github.ref_name }}"
+          $version = $version.TrimStart("v")
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = "0.0.0"
+          }
+          ./scripts/build_windows_packages.ps1 -AppDir dist/windows/PasteGlide -Version $version
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pasteglide-windows-packages
+          path: |
+            dist/*.msi
+            dist/*.zip

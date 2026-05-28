@@ -31,6 +31,15 @@ swift run PasteGlidePortable search-demo "type:text pinned:true invoice"
 swift run PasteGlidePortable settings-demo
 ```
 
+### Packaging automatique
+
+Le workflow GitHub Actions `Portable Packages` construit ce binaire portable en environnement natif Linux et Windows. Il publie des artefacts de workflow:
+
+- Linux: `.deb` et `.rpm`
+- Windows: `.zip` et `.msi`
+
+Ces paquets valident la chaine de compilation/packaging multiplateforme. Ils ne remplacent pas encore l'application graphique complete tant que les UI Linux et Windows ne sont pas implementees.
+
 ### Commandes attendues apres portage
 
 Linux:
@@ -75,6 +84,15 @@ swift run PasteGlidePortable classify "https://example.com"
 swift run PasteGlidePortable search-demo "type:text pinned:true invoice"
 swift run PasteGlidePortable settings-demo
 ```
+
+### Automated Packaging
+
+The `Portable Packages` GitHub Actions workflow builds this portable binary in native Linux and Windows environments. It publishes workflow artifacts:
+
+- Linux: `.deb` and `.rpm`
+- Windows: `.zip` and `.msi`
+
+These packages validate the cross-platform build/packaging chain. They do not replace the complete graphical app until the Linux and Windows UIs are implemented.
 
 ### Expected Commands After Porting
 
