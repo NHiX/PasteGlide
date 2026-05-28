@@ -32,6 +32,16 @@ Créer le DMG de distribution avec l'app et un raccourci vers `/Applications`:
 
 Le DMG contient `PasteGlide.app` et un raccourci `Applications` pour installer l'app par glisser-déposer. L'app est signée ad-hoc pour garder un bundle macOS cohérent; sans certificat Apple Developer ID et notarisation, macOS peut encore demander une ouverture via clic droit puis `Ouvrir`.
 
+Pour produire un DMG notarizé par Apple, il faut un compte Apple Developer, un certificat `Developer ID Application` et un profil `notarytool` enregistré dans le trousseau. Ensuite:
+
+```bash
+DEVELOPER_ID_APPLICATION="Developer ID Application: Votre Nom (TEAMID)" \
+NOTARYTOOL_PROFILE="pasteglide-notary" \
+./scripts/notarize_dmg.sh
+```
+
+Sans notarisation, si macOS affiche "Apple n'a pas pu confirmer que PasteGlide ne contenait pas de logiciel malveillant", ouvrez `Réglages Système > Confidentialité et sécurité`, puis cliquez sur `Ouvrir quand même`, ou faites clic droit sur l'app puis `Ouvrir`.
+
 ## Raccourcis
 
 Le raccourci global par défaut est `⌥⌘V`.

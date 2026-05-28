@@ -32,6 +32,16 @@ Build the distribution DMG with the app and an `/Applications` shortcut:
 
 The DMG contains `PasteGlide.app` and an `Applications` shortcut for drag-and-drop installation. The app is ad-hoc signed so the macOS bundle stays consistent; without an Apple Developer ID certificate and notarization, macOS may still require right-clicking the app and choosing `Open`.
 
+To produce an Apple-notarized DMG, you need an Apple Developer account, a `Developer ID Application` certificate, and a stored `notarytool` keychain profile. Then run:
+
+```bash
+DEVELOPER_ID_APPLICATION="Developer ID Application: Your Name (TEAMID)" \
+NOTARYTOOL_PROFILE="pasteglide-notary" \
+./scripts/notarize_dmg.sh
+```
+
+Without notarization, if macOS shows "Apple could not verify PasteGlide is free of malware", open `System Settings > Privacy & Security` and click `Open Anyway`, or right-click the app and choose `Open`.
+
 ## Shortcuts
 
 The default global shortcut is `⌥⌘V`.

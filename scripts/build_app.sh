@@ -12,6 +12,11 @@ CONTENTS_DIR="${APP_DIR}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 ICON_FILE="${ROOT_DIR}/Assets/AppIcon.icns"
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+CODESIGN_ARGS=(--force --deep --sign "${SIGN_IDENTITY}")
+if [[ "${CODESIGN_HARDENED_RUNTIME:-0}" == "1" ]]; then
+  CODESIGN_ARGS+=(--options runtime)
+fi
 
 cd "${ROOT_DIR}"
 
@@ -60,6 +65,6 @@ PLIST
 
 chmod +x "${MACOS_DIR}/${APP_BASE_NAME}"
 
-codesign --force --deep --sign - "${APP_DIR}"
+codesign "${CODESIGN_ARGS[@]}" "${APP_DIR}"
 
 echo "${APP_DIR}"
