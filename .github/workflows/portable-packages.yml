@@ -71,7 +71,11 @@ jobs:
           if (-not $swift) {
             throw "Swift executable was not found after installation."
           }
-          $swift.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $swiftPaths = @($swift.DirectoryName)
+          $swiftPaths += Get-ChildItem $swiftSearchRoots -Recurse -Filter *.dll -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.DirectoryName } |
+            Sort-Object -Unique
+          $swiftPaths | Sort-Object -Unique | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Build portable executable
         shell: pwsh
